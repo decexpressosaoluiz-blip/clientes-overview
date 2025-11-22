@@ -5,6 +5,10 @@ import { ClientData, Sentiment, Client } from "../types";
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeClientFile = async (fileContent: string, fileName: string): Promise<ClientData[]> => {
+  if (!process.env.API_KEY) {
+    console.warn("API Key not found. AI features will be disabled.");
+    return [];
+  }
   const model = "gemini-2.5-flash";
 
   const prompt = `
@@ -80,6 +84,8 @@ export interface InsightResult {
 }
 
 export const generateClientInsights = async (client: Client): Promise<InsightResult[]> => {
+  if (!process.env.API_KEY) return [{ category: 'attention', title: 'API Key Missing', description: 'Configure a chave de API no Vercel.' }];
+  
   const model = "gemini-2.5-flash";
 
   const historySummary = client.history.slice(-5).map(h =>
@@ -148,10 +154,11 @@ export const generateClientInsights = async (client: Client): Promise<InsightRes
 };
 
 export const generatePortfolioAnalysis = async (clients: Client[]): Promise<string> => {
+  if (!process.env.API_KEY) return "Erro: API Key não configurada no ambiente.";
+  
   const model = "gemini-2.5-flash";
 
   // 1. Preparar Resumo dos Dados (Contexto)
-  // Para não estourar tokens, enviamos estatísticas agregadas e top 50 clientes
   const totalRevenue = clients.reduce((acc, c) => acc + c.totalRevenue, 0);
   const activeClients = clients.filter(c => c.recency <= 90).length;
   const churnRiskClients = clients.filter(c => c.recency > 90 && c.recency <= 180).length;
@@ -252,6 +259,6 @@ export const generatePortfolioAnalysis = async (clients: Client[]): Promise<stri
     return response.text || "Não foi possível gerar a análise.";
   } catch (error) {
     console.error("Erro na análise de portfólio:", error);
-    return "Erro ao conectar com o analista IA. Tente novamente mais tarde.";
+    return "Erro ao conectar com o analista IA. Verifique a chave de API.";
   }
 };
