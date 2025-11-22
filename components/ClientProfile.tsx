@@ -139,7 +139,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           bg: 'bg-emerald-950/30', 
           border: 'border-emerald-500/30', 
           badgeBg: 'bg-emerald-500/20',
-          label: 'Oportunidade' 
+          label: 'Expansão' 
         };
       case 'risk':
         return { 
@@ -247,7 +247,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             {!client.justification && (client.segment === Segment.AT_RISK || client.segment === Segment.LOST) && (
                 <button 
                     onClick={() => setShowJustifyForm(true)}
-                    className="hidden sm:flex px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors"
+                    className="hidden sm:flex px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer"
                 >
                     Justificar Inatividade
                 </button>
@@ -277,13 +277,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       <div className="flex items-center px-6 border-b border-sle-neutral-100 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 sticky top-[72px] z-20 gap-6">
           <button 
             onClick={() => setActiveTab('overview')}
-            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors ${activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
+            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors cursor-pointer ${activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
           >
             Visão Geral
           </button>
           <button 
             onClick={() => setActiveTab('actions')}
-            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'actions' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
+            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${activeTab === 'actions' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
           >
             Diário de Bordo
             <span className="bg-sle-neutral-100 dark:bg-sle-blue-800 text-sle-neutral-500 dark:text-sle-blue-200 px-1.5 rounded text-[9px]">{(client.actions?.length || 0)}</span>

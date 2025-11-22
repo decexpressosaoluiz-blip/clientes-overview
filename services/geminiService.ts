@@ -108,13 +108,19 @@ export const generateClientInsights = async (client: Client): Promise<InsightRes
     ${historySummary}
 
     Gere EXATAMENTE 3 sugestões estruturadas JSON.
-    Classifique cada sugestão em uma destas categorias: 
-    - 'opportunity' (para upsell, cross-sell, crescimento)
-    - 'risk' (para risco de churn, queda de volume)
-    - 'attention' (pontos de atenção operacional)
-    - 'retention' (ações para manter a fidelidade)
+    
+    Categorias permitidas e seus significados:
+    - 'opportunity': Use para "Expansão de Conta" ou "Oferta Complementar" (evite termos técnicos como Upsell/Cross-sell).
+    - 'risk': Para risco de perda de cliente ou queda drástica de volume.
+    - 'attention': Pontos de atenção operacionais ou mudanças de comportamento.
+    - 'retention': Ações de fidelização e relacionamento.
 
-    Seja direto, comercial e acionável.
+    Regras de Texto:
+    1. Use linguagem simples e comercial.
+    2. Evite jargões como "Churn", "Upsell", "Cross-sell". 
+    3. Use "Risco de Perda", "Expansão", "Oferta Complementar".
+    
+    Seja direto e acionável.
   `;
 
   try {
@@ -248,6 +254,7 @@ export const generatePortfolioAnalysis = async (clients: Client[]): Promise<stri
     Nunca gere erro caso algum dado não exista. Apenas indique que a análise não é possível.
     Só execute análises marcadas como “✓ possível”.
     Mantenha clareza, precisão e visão analítica de alto nível.
+    Substitua termos técnicos como Upsell e Cross-sell por termos mais naturais em português (ex: Expansão, Oferta Complementar).
   `;
 
   try {

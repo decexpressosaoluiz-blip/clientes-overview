@@ -435,17 +435,21 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       else if (score >= 60) health = HealthScore.GOOD;
       else if (score <= 30) health = HealthScore.CRITICAL;
 
-      // Segmentação (New logic: based on start date)
+      // Segmentação (CORREÇÃO DE LÓGICA: PRIORIZAR INATIVIDADE)
       let segment = Segment.POTENTIAL;
 
       if (daysSinceLastGlobal > 180) {
         segment = Segment.LOST;
       } else if (daysSinceLastGlobal > 90) {
         segment = Segment.AT_RISK;
-      } else if (daysSinceFirstGlobal <= 90) { 
-        segment = Segment.NEW;
       } else {
-        segment = Segment.LOYAL;
+        // Se chegou aqui, o cliente está ATIVO (<= 90 dias)
+        // Apenas se estiver ativo verificamos se é Novo ou Recorrente
+        if (daysSinceFirstGlobal <= 90) { 
+            segment = Segment.NEW;
+        } else {
+            segment = Segment.LOYAL;
+        }
       }
 
       if (hasSegmentFilter && !filterSegmentsSet.has(segment)) {
