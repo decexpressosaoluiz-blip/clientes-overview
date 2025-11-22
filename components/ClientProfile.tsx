@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Client, HealthScore, Segment, ClientJustification, ClientAction } from '../types';
+import { Client, HealthScore, Segment, ClientAction, InactivityReason, ClientJustification } from '../types';
 import { 
-  ArrowLeft, Phone, Mail, TrendingUp, Package, DollarSign, 
+  ArrowLeft, TrendingUp, Package, DollarSign, 
   BrainCircuit, AlertTriangle, Clock, Loader2, MoreHorizontal, 
-  ArrowUpRight, ArrowDownRight, Calendar, ShieldCheck, Zap, Sparkles, MapPin, Route
+  ArrowUpRight, ArrowDownRight, Calendar, ShieldCheck, Zap, Sparkles, MapPin, Route,
+  FileText, Plus, Check, X, Ban, History
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
@@ -20,8 +21,23 @@ interface ClientProfileProps {
 export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, onJustify, onLogAction }) => {
   const [aiSuggestions, setAiSuggestions] = useState<InsightResult[]>([]);
   const [loadingAI, setLoadingAI] = useState(false);
+  
+  // UI States
+  const [showActionForm, setShowActionForm] = useState(false);
+  const [showJustifyForm, setShowJustifyForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'actions'>('overview');
 
-  // Get Theme for Chart
+  // Justification Form
+  const [justificationReason, setJustificationReason] = useState<InactivityReason>('Empresa Fechada');
+  const [newCnpj, setNewCnpj] = useState('');
+
+  // Action Log Form
+  const [actionDate, setActionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [actionUser, setActionUser] = useState('');
+  const [actionContact, setActionContact] = useState('');
+  const [actionNote, setActionNote] = useState('');
+
+  // Get Theme
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'));
@@ -46,24 +62,26 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       fetchInsights();
       
       return () => { isMounted = false; };
-  }, [client]);
+  }, [client.id]);
 
-  // Processar dados para o gráfico
+  // Processar dados para o gráfico com contagem e ticket médio
   const chartData = useMemo(() => {
-    const historyMap = new Map<string, number>();
+    const historyMap = new Map<string, { value: number, count: number }>();
     if (client.history.length > 0) {
         client.history.forEach(t => {
             const key = t.date.substring(0, 7); // YYYY-MM
-            const current = historyMap.get(key) || 0;
-            historyMap.set(key, current + t.value);
+            const current = historyMap.get(key) || { value: 0, count: 0 };
+            historyMap.set(key, { value: current.value + t.value, count: current.count + 1 });
         });
     }
     const data = Array.from(historyMap.entries())
-        .map(([date, value]) => ({
+        .map(([date, data]) => ({
             date,
             name: format(parseISO(`${date}-01`), 'MMM', { locale: ptBR }),
             fullDate: format(parseISO(`${date}-01`), 'MMMM yyyy', { locale: ptBR }),
-            value
+            value: data.value,
+            count: data.count,
+            avgTicket: data.count > 0 ? data.value / data.count : 0
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -83,19 +101,15 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       };
   }, [chartData]);
 
-  // Análise de Rotas (Top Origins e Routes)
+  // Análise de Rotas
   const { topOrigin, topDestination, topRoutes } = useMemo(() => {
     const originCounts: Record<string, number> = {};
     const destCounts: Record<string, number> = {};
     const routeStats: Record<string, { origin: string, dest: string, value: number, count: number }> = {};
 
     client.history.forEach(t => {
-        // Origins
         originCounts[t.origin] = (originCounts[t.origin] || 0) + 1;
-        // Destinations
         destCounts[t.destination] = (destCounts[t.destination] || 0) + 1;
-        
-        // Routes
         const routeKey = `${t.origin}|${t.destination}`;
         if (!routeStats[routeKey]) {
             routeStats[routeKey] = { origin: t.origin, dest: t.destination, value: 0, count: 0 };
@@ -104,15 +118,12 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
         routeStats[routeKey].count += 1;
     });
 
-    // Sort Origins
     const sortedOrigins = Object.entries(originCounts).sort((a, b) => b[1] - a[1]);
     const topOrg = sortedOrigins.length > 0 ? sortedOrigins[0][0] : 'N/A';
 
-    // Sort Destinations
     const sortedDest = Object.entries(destCounts).sort((a, b) => b[1] - a[1]);
     const topDst = sortedDest.length > 0 ? sortedDest[0][0] : 'N/A';
 
-    // Sort Routes by Value (Revenue)
     const sortedRoutes = Object.values(routeStats).sort((a, b) => b.value - a.value).slice(0, 5);
 
     return { topOrigin: topOrg, topDestination: topDst, topRoutes: sortedRoutes };
@@ -137,7 +148,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           bg: 'bg-rose-950/30', 
           border: 'border-rose-500/30',
           badgeBg: 'bg-rose-500/20', 
-          label: 'Potencial de Reativação' 
+          label: 'Risco' 
         };
       case 'retention':
         return { 
@@ -146,7 +157,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           bg: 'bg-blue-950/30', 
           border: 'border-blue-500/30', 
           badgeBg: 'bg-blue-500/20',
-          label: 'Retenção' 
+          label: 'Fidelização' 
         };
       default:
         return { 
@@ -160,11 +171,40 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
     }
   };
 
+  const handleSubmitJustification = () => {
+    if (onJustify) {
+        onJustify(client.id, {
+            reason: justificationReason,
+            newCnpj: justificationReason === 'Mudança de CNPJ' ? newCnpj : undefined,
+            date: new Date().toISOString(),
+            user: 'Usuário'
+        });
+        setShowJustifyForm(false);
+    }
+  };
+
+  const handleSubmitAction = () => {
+    if (onLogAction && actionNote && actionContact) {
+        onLogAction(client.id, {
+            id: Date.now().toString(),
+            date: actionDate,
+            user: actionUser || 'Agente',
+            contactName: actionContact,
+            type: 'Call',
+            note: actionNote
+        });
+        setShowActionForm(false);
+        setActionNote('');
+        setActionContact('');
+    }
+  };
+
   const chartGridColor = isDark ? '#1A1B62' : '#E5E5F1';
   const chartTextColor = isDark ? '#BFC0EF' : '#606084';
 
   return (
-    <div className="flex flex-col h-full bg-[#F8F9FC] dark:bg-sle-blue-950 animate-in slide-in-from-right duration-300 font-sans selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-900 dark:selection:text-indigo-100">
+    <div className="flex flex-col h-full bg-[#F8F9FC] dark:bg-sle-blue-950 animate-in slide-in-from-right duration-300 font-sans relative">
+      
       {/* Header Compacto */}
       <div className="bg-white/80 dark:bg-sle-blue-900/80 backdrop-blur-xl border-b border-sle-neutral-200 dark:border-sle-blue-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-4">
@@ -177,13 +217,19 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           <div>
             <h2 className="text-lg font-bold text-sle-neutral-900 dark:text-white flex items-center gap-2">
               {client.name}
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider ${
-                  client.segment === Segment.LOST ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' :
-                  client.segment === Segment.AT_RISK ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                  'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-              }`}>
-                  {client.segment}
-              </span>
+              {client.justification ? (
+                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1">
+                    <Ban size={10} /> Inativo Justificado
+                 </span>
+              ) : (
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider ${
+                    client.segment === Segment.LOST ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' :
+                    client.segment === Segment.AT_RISK ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                    'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                }`}>
+                    {client.segment}
+                </span>
+              )}
             </h2>
             <div className="flex items-center gap-4 text-xs text-sle-neutral-500 dark:text-sle-blue-300 mt-0.5 font-medium">
                <span className="font-mono">{client.cnpj}</span>
@@ -197,27 +243,57 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             </div>
           </div>
         </div>
-        <div className="hidden sm:flex flex-col items-end">
-             <span className="text-[10px] text-sle-neutral-400 dark:text-sle-blue-400 font-bold uppercase tracking-widest mb-1">Score de Saúde</span>
-             <div className="flex items-center gap-2">
-                <div className="relative w-24 h-1.5 bg-sle-neutral-100 dark:bg-sle-blue-800 rounded-full overflow-hidden">
-                    <div 
-                        className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
-                            client.healthValue >= 80 ? 'bg-emerald-500' : 
-                            client.healthValue >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                        }`} 
-                        style={{ width: `${client.healthValue}%` }}
-                    />
+        <div className="flex items-center gap-3">
+            {!client.justification && (client.segment === Segment.AT_RISK || client.segment === Segment.LOST) && (
+                <button 
+                    onClick={() => setShowJustifyForm(true)}
+                    className="hidden sm:flex px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors"
+                >
+                    Justificar Inatividade
+                </button>
+            )}
+             <div className="hidden sm:flex flex-col items-end ml-4 border-l border-sle-neutral-200 dark:border-sle-blue-800 pl-4">
+                <span className="text-[10px] text-sle-neutral-400 dark:text-sle-blue-400 font-bold uppercase tracking-widest mb-1">Score de Saúde</span>
+                <div className="flex items-center gap-2">
+                    <div className="relative w-24 h-1.5 bg-sle-neutral-100 dark:bg-sle-blue-800 rounded-full overflow-hidden">
+                        <div 
+                            className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
+                                client.healthValue >= 80 ? 'bg-emerald-500' : 
+                                client.healthValue >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`} 
+                            style={{ width: `${client.healthValue}%` }}
+                        />
+                    </div>
+                    <span className={`text-sm font-extrabold ${
+                        client.healthValue >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 
+                        client.healthValue >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                    }`}>{client.healthValue}</span>
                 </div>
-                <span className={`text-sm font-extrabold ${
-                     client.healthValue >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 
-                     client.healthValue >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
-                }`}>{client.healthValue}</span>
              </div>
         </div>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="flex items-center px-6 border-b border-sle-neutral-100 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 sticky top-[72px] z-20 gap-6">
+          <button 
+            onClick={() => setActiveTab('overview')}
+            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors ${activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
+          >
+            Visão Geral
+          </button>
+          <button 
+            onClick={() => setActiveTab('actions')}
+            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'actions' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
+          >
+            Diário de Bordo
+            <span className="bg-sle-neutral-100 dark:bg-sle-blue-800 text-sle-neutral-500 dark:text-sle-blue-200 px-1.5 rounded text-[9px]">{(client.actions?.length || 0)}</span>
+          </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+        
+        {/* CONTEÚDO DA ABA VISÃO GERAL */}
+        {activeTab === 'overview' && (
         <div className="max-w-7xl mx-auto space-y-6">
             
             {/* KPI Cards - Estilo Minimalista */}
@@ -290,12 +366,24 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                                     cursor={{ stroke: chartGridColor, strokeWidth: 1 }}
                                     content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
                                             return (
                                                 <div className="bg-sle-neutral-900 dark:bg-black text-white text-xs p-3 rounded-xl shadow-xl border border-sle-neutral-700/50 dark:border-sle-blue-800">
-                                                    <p className="font-bold mb-1 opacity-60 uppercase tracking-wider">{payload[0].payload.fullDate}</p>
-                                                    <p className="text-lg font-bold text-emerald-400">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payload[0].value as number)}
-                                                    </p>
+                                                    <p className="font-bold mb-2 opacity-60 uppercase tracking-wider border-b border-white/10 pb-1">{data.fullDate}</p>
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex justify-between gap-4">
+                                                            <span className="text-sle-neutral-400">Receita:</span>
+                                                            <span className="font-bold text-emerald-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.value)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between gap-4">
+                                                            <span className="text-sle-neutral-400">Envios:</span>
+                                                            <span className="font-bold text-white">{data.count}</span>
+                                                        </div>
+                                                        <div className="flex justify-between gap-4">
+                                                            <span className="text-sle-neutral-400">Ticket Médio:</span>
+                                                            <span className="font-bold text-indigo-300">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.avgTicket)}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             );
                                         }
@@ -459,10 +547,200 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                                 </div>
                             ))}
                     </div>
+
+                    {client.justification && (
+                        <div className="mt-6 pt-4 border-t border-sle-neutral-100 dark:border-sle-blue-800">
+                            <h5 className="text-xs font-bold text-sle-neutral-900 dark:text-white mb-2">Justificativa de Inatividade</h5>
+                            <div className="p-3 bg-slate-50 dark:bg-sle-blue-950 rounded-xl border border-slate-100 dark:border-sle-blue-800">
+                                <p className="text-xs font-semibold text-slate-700 dark:text-sle-blue-200">{client.justification.reason}</p>
+                                {client.justification.newCnpj && (
+                                    <p className="text-[10px] text-slate-500 dark:text-sle-blue-400 mt-1 font-mono">Novo CNPJ: {client.justification.newCnpj}</p>
+                                )}
+                                <p className="text-[10px] text-slate-400 dark:text-sle-blue-500 mt-2 flex items-center gap-1">
+                                    <Clock size={10} /> {format(parseISO(client.justification.date), 'dd/MM/yy')} por {client.justification.user}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
+        )}
+
+        {/* CONTEÚDO DA ABA DIÁRIO DE BORDO */}
+        {activeTab === 'actions' && (
+            <div className="max-w-4xl mx-auto">
+                 <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className="text-lg font-bold text-sle-neutral-900 dark:text-white">Histórico de Ações</h3>
+                        <p className="text-sm text-sle-neutral-500 dark:text-sle-blue-300">Registro de contatos e ações para clientes em Atenção Imediata.</p>
+                    </div>
+                    <button 
+                        onClick={() => setShowActionForm(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all active:scale-95"
+                    >
+                        <Plus size={16} /> Nova Ação
+                    </button>
+                 </div>
+
+                 <div className="space-y-4">
+                     {(client.actions || []).length === 0 ? (
+                         <div className="text-center py-12 bg-white dark:bg-sle-blue-900 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 border-dashed">
+                             <History size={32} className="mx-auto text-sle-neutral-300 dark:text-sle-blue-500 mb-2" />
+                             <p className="text-sle-neutral-400 dark:text-sle-blue-400 font-medium text-sm">Nenhuma ação registrada ainda.</p>
+                         </div>
+                     ) : (
+                         (client.actions || []).map((action) => (
+                             <div key={action.id} className="bg-white dark:bg-sle-blue-900 p-5 rounded-2xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm flex gap-4 hover:shadow-md transition-all">
+                                 <div className="flex flex-col items-center text-sle-neutral-400 dark:text-sle-blue-400 w-16 flex-shrink-0 border-r border-sle-neutral-100 dark:border-sle-blue-800 pr-4">
+                                     <span className="text-xl font-bold text-sle-neutral-800 dark:text-white">{format(parseISO(action.date), 'dd')}</span>
+                                     <span className="text-xs font-bold uppercase">{format(parseISO(action.date), 'MMM')}</span>
+                                     <span className="text-[10px] mt-1 text-sle-neutral-300 dark:text-sle-blue-600">{format(parseISO(action.date), 'yyyy')}</span>
+                                 </div>
+                                 <div className="flex-1">
+                                     <div className="flex justify-between items-start mb-1">
+                                         <h4 className="font-bold text-sle-neutral-800 dark:text-white">{action.contactName}</h4>
+                                         <span className="text-[10px] px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md font-bold uppercase">{action.type}</span>
+                                     </div>
+                                     <p className="text-sm text-sle-neutral-600 dark:text-sle-blue-200 leading-relaxed mb-2">{action.note}</p>
+                                     <div className="flex items-center gap-2 text-[10px] text-sle-neutral-400 dark:text-sle-blue-500 font-medium">
+                                         <span className="flex items-center gap-1"><FileText size={10} /> Registrado por: <span className="text-sle-neutral-600 dark:text-sle-blue-300">{action.user}</span></span>
+                                     </div>
+                                 </div>
+                             </div>
+                         ))
+                     )}
+                 </div>
+            </div>
+        )}
+
       </div>
+
+      {/* Modal Justificar */}
+      {showJustifyForm && (
+          <div className="absolute inset-0 z-50 bg-sle-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-sle-blue-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                  <div className="px-6 py-4 border-b border-sle-neutral-100 dark:border-sle-blue-800 flex justify-between items-center bg-slate-50 dark:bg-sle-blue-950">
+                      <h3 className="font-bold text-sle-neutral-900 dark:text-white">Justificar Inatividade</h3>
+                      <button onClick={() => setShowJustifyForm(false)} className="text-sle-neutral-400 dark:text-sle-blue-400 hover:text-rose-500"><X size={20}/></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div>
+                          <label className="block text-xs font-bold text-sle-neutral-500 dark:text-sle-blue-300 uppercase mb-1.5">Motivo</label>
+                          <select 
+                            className="w-full p-3 bg-white dark:bg-sle-blue-950 border border-sle-neutral-200 dark:border-sle-blue-800 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white"
+                            value={justificationReason || ''}
+                            onChange={(e) => setJustificationReason(e.target.value as InactivityReason)}
+                          >
+                              <option value="Empresa Fechada">Empresa Fechada</option>
+                              <option value="Avaria/Extravio">Avaria/Extravio</option>
+                              <option value="Mudança de CNPJ">Mudança de CNPJ</option>
+                              <option value="Rota não Atendida">Rota não atendida pela empresa</option>
+                          </select>
+                      </div>
+                      
+                      {justificationReason === 'Mudança de CNPJ' && (
+                          <div className="animate-in fade-in slide-in-from-top-2">
+                              <label className="block text-xs font-bold text-sle-neutral-500 dark:text-sle-blue-300 uppercase mb-1.5">Novo CNPJ</label>
+                              <input 
+                                type="text" 
+                                placeholder="00.000.000/0000-00"
+                                className="w-full p-3 bg-white dark:bg-sle-blue-950 border border-sle-neutral-200 dark:border-sle-blue-800 rounded-xl text-sm font-medium dark:text-white"
+                                value={newCnpj}
+                                onChange={(e) => setNewCnpj(e.target.value)}
+                              />
+                          </div>
+                      )}
+
+                      <div className="pt-2">
+                          <button 
+                            onClick={handleSubmitJustification}
+                            className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold shadow-lg shadow-rose-200 dark:shadow-none hover:bg-rose-700 transition-all active:scale-95"
+                          >
+                              Confirmar Justificativa
+                          </button>
+                          <p className="text-center text-[10px] text-sle-neutral-400 dark:text-sle-blue-500 mt-3">
+                              Este cliente será movido para a lista de Justificados.
+                          </p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Modal Nova Ação */}
+      {showActionForm && (
+          <div className="absolute inset-0 z-50 bg-sle-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-sle-blue-900 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                  <div className="px-6 py-4 border-b border-sle-neutral-100 dark:border-sle-blue-800 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30">
+                      <h3 className="font-bold text-indigo-900 dark:text-indigo-200">Registrar Ação</h3>
+                      <button onClick={() => setShowActionForm(false)} className="text-indigo-400 hover:text-indigo-700 dark:hover:text-white"><X size={20}/></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-sle-neutral-500 dark:text-sle-blue-300 uppercase mb-1.5">Data</label>
+                              <input 
+                                type="date" 
+                                className="w-full p-2.5 bg-white dark:bg-sle-blue-950 border border-sle-neutral-200 dark:border-sle-blue-800 rounded-xl text-sm dark:text-white"
+                                value={actionDate}
+                                onChange={(e) => setActionDate(e.target.value)}
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-sle-neutral-500 dark:text-sle-blue-300 uppercase mb-1.5">Quem fez a ação?</label>
+                              <input 
+                                type="text" 
+                                placeholder="Seu nome"
+                                className="w-full p-2.5 bg-white dark:bg-sle-blue-950 border border-sle-neutral-200 dark:border-sle-blue-800 rounded-xl text-sm dark:text-white"
+                                value={actionUser}
+                                onChange={(e) => setActionUser(e.target.value)}
+                              />
+                          </div>
+                      </div>
+                      
+                      <div>
+                          <label className="block text-xs font-bold text-sle-neutral-500 dark:text-sle-blue-300 uppercase mb-1.5">Responsável na Empresa</label>
+                          <input 
+                            type="text" 
+                            placeholder="Nome do contato"
+                            className="w-full p-2.5 bg-white dark:bg-sle-blue-950 border border-sle-neutral-200 dark:border-sle-blue-800 rounded-xl text-sm dark:text-white"
+                            value={actionContact}
+                            onChange={(e) => setActionContact(e.target.value)}
+                          />
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-sle-neutral-500 dark:text-sle-blue-300 uppercase mb-1.5">Observação / Resultado</label>
+                          <textarea 
+                            rows={4}
+                            placeholder="Descreva o que foi conversado ou acordado..."
+                            className="w-full p-3 bg-white dark:bg-sle-blue-950 border border-sle-neutral-200 dark:border-sle-blue-800 rounded-xl text-sm resize-none dark:text-white"
+                            value={actionNote}
+                            onChange={(e) => setActionNote(e.target.value)}
+                          />
+                      </div>
+
+                      <div className="pt-2 flex gap-3">
+                          <button 
+                             onClick={() => setShowActionForm(false)}
+                             className="flex-1 py-3 bg-white dark:bg-transparent border border-sle-neutral-200 dark:border-sle-blue-600 text-sle-neutral-600 dark:text-sle-blue-200 rounded-xl font-bold hover:bg-sle-neutral-50 dark:hover:bg-sle-blue-800"
+                          >
+                              Cancelar
+                          </button>
+                          <button 
+                            onClick={handleSubmitAction}
+                            disabled={!actionNote || !actionContact}
+                            className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              Salvar Registro
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };

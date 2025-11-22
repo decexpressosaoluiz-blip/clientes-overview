@@ -1,10 +1,10 @@
 export enum Segment {
-  CHAMPIONS = 'Cliente Fiel',      // Antigo Champions/Loyal
-  LOYAL = 'Recorrente',               // Antigo Loyal
-  POTENTIAL = 'Potencial',            // Antigo Potential
-  AT_RISK = 'Risco de Perda',         // Antigo At Risk
-  LOST = 'Inativo/Perdido',           // Antigo Lost
-  NEW = 'Novo Cliente'             // Antigo New
+  CHAMPIONS = 'Cliente Fiel',
+  LOYAL = 'Recorrente',
+  POTENTIAL = 'Potencial',
+  AT_RISK = 'Risco de Perda',
+  LOST = 'Inativo/Perdido',
+  NEW = 'Novo Cliente'
 }
 
 export enum HealthScore {
@@ -26,64 +26,61 @@ export enum Sentiment {
   NEGATIVE = 'Negativo'
 }
 
-// Opportunity Tags for Inactive Clients
 export type OpportunityTag = 'Frete Premium' | 'Alto Volume' | 'Recuperável' | null;
+
+export type InactivityReason = 'Empresa Fechada' | 'Avaria/Extravio' | 'Mudança de CNPJ' | 'Rota não Atendida' | null;
 
 export interface Transaction {
   date: string;
   value: number;
   origin: string;
   destination: string;
-  // Campos otimizados para filtragem O(1)
   year: number; 
   month: number;
 }
 
 export interface ClientJustification {
-  reason: string;
-  note: string;
+  reason: InactivityReason;
+  newCnpj?: string;
   date: string;
-  user?: string;
+  user: string;
 }
 
 export interface ClientAction {
   id: string;
-  type: 'call' | 'email' | 'meeting' | 'whatsapp' | 'note';
-  description: string;
-  date: string;
-  user?: string;
+  date: string; // ISO Date
+  user: string; // Quem fez a ação
+  contactName: string; // Responsável na empresa
+  type: 'Call' | 'Email' | 'Meeting' | 'Whatsapp';
+  note: string;
 }
 
 export interface Client {
   id: string;
-  name: string; // Coluna F
-  cnpj: string; // Coluna E
+  name: string;
+  cnpj: string;
   
-  // Histórico completo para cálculos dinâmicos
   history: Transaction[];
 
-  // Totais (serão recalculados baseados nos filtros)
   totalRevenue: number; 
   totalShipments: number; 
   
-  lastShipmentDate: string; // A data mais recente global (para cálculo de churn real)
+  lastShipmentDate: string;
   firstShipmentDate: string;
   origin: string[]; 
   destination: string[]; 
   
-  // Calculated Fields
-  recency: number; // Dias desde o último envio
-  frequency: number; // Quantidade de envios
-  monetary: number; // Valor total (no período filtrado)
+  recency: number;
+  frequency: number;
+  monetary: number;
   averageTicket: number;
   
   segment: Segment;
   abcCategory: ABCCategory;
   healthScore: HealthScore;
-  healthValue: number; // 0-100
+  healthValue: number;
   opportunityTag?: OpportunityTag;
 
-  // Override Fields
   justification?: ClientJustification;
   actions?: ClientAction[];
 }
@@ -108,14 +105,14 @@ export interface ClientAlert {
   type: 'ticket_drop' | 'frequency_drop' | 'anomaly';
   message: string;
   severity: 'high' | 'medium';
-  metric: string; // ex: "-30%"
-  client: Client; // Referência completa para abrir modal
+  metric: string;
+  client: Client;
 }
 
 export interface FilterState {
   years: number[];
   months: number[];
-  clients: string[]; // IDs
+  clients: string[];
   origins: string[];
   destinations: string[];
   segments: Segment[];
