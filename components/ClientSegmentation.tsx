@@ -24,7 +24,7 @@ export const ClientSegmentation: React.FC<ClientSegmentationProps> = ({ clients,
 
   const atRiskClients = useMemo(() => clients.filter(c => c.segment === Segment.AT_RISK), [clients]);
   const lostClients = useMemo(() => clients.filter(c => c.segment === Segment.LOST), [clients]);
-  const premiumLostCount = useMemo(() => lostClients.filter(c => c.opportunityTag === 'Premium').length, [lostClients]);
+  const premiumLostCount = useMemo(() => lostClients.filter(c => c.opportunityTag === 'Frete Premium').length, [lostClients]);
 
   return (
     <div className="bg-white p-8 rounded-[2rem] shadow-soft border border-sle-neutral-100 h-full flex flex-col select-none transition-all hover:shadow-elevated group">
