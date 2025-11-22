@@ -1,6 +1,6 @@
 import React, { useState, useMemo, memo } from 'react';
 import { FilterState, Client, Segment } from '../types';
-import { Search, X, Check, Building2, MapPin, Navigation, Users, CheckSquare, Square, Trash2, CheckCircle2, CalendarRange, CalendarDays, ChevronDown, Fingerprint } from 'lucide-react';
+import { Search, X, Check, Building2, MapPin, Navigation, Users, CheckSquare, Square, Trash2, CheckCircle2, CalendarRange, CalendarDays, ChevronDown, Fingerprint, Filter } from 'lucide-react';
 
 interface FilterBarProps {
   clients: Client[];
@@ -117,6 +117,33 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
     const newSegments = filters.segments.includes(segment) 
       ? filters.segments.filter(s => s !== segment)
       : [...filters.segments, segment];
+    onFilterChange({ ...filters, segments: newSegments });
+  };
+
+  // Helper para grupos de status
+  const toggleStatusGroup = (group: 'active' | 'risk' | 'inactive') => {
+    let targetSegments: Segment[] = [];
+    if (group === 'active') {
+        targetSegments = [Segment.CHAMPIONS, Segment.LOYAL, Segment.POTENTIAL, Segment.NEW];
+    } else if (group === 'risk') {
+        targetSegments = [Segment.AT_RISK];
+    } else if (group === 'inactive') {
+        targetSegments = [Segment.LOST];
+    }
+
+    // Verificar se TODOS do grupo estão selecionados
+    const allSelected = targetSegments.every(s => filters.segments.includes(s));
+
+    let newSegments = [...filters.segments];
+    if (allSelected) {
+        // Desmarcar todos
+        newSegments = newSegments.filter(s => !targetSegments.includes(s));
+    } else {
+        // Marcar todos (adicionar os que faltam)
+        targetSegments.forEach(s => {
+            if (!newSegments.includes(s)) newSegments.push(s);
+        });
+    }
     onFilterChange({ ...filters, segments: newSegments });
   };
 
@@ -324,7 +351,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                 )}
             </div>
 
-            {/* Status */}
+            {/* Status (Com Grupo Macro) */}
             <div className="relative">
                 <button 
                     onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
@@ -343,15 +370,34 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                 {openDropdown === 'status' && (
                      <>
                         <div className="fixed inset-0 z-[90]" onClick={() => setOpenDropdown(null)}></div>
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-sle-neutral-100 z-[100] p-2 animate-in fade-in zoom-in-95 duration-200">
-                            {Object.values(Segment).map(s => (
-                                <button key={s} onClick={() => toggleSegment(s)} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex justify-between items-center transition-all cursor-pointer mb-0.5 active:scale-[0.98] ${filters.segments.includes(s) ? 'bg-indigo-50 text-indigo-700' : 'text-sle-neutral-600 hover:bg-sle-neutral-50'}`}>
-                                    <div className="flex items-center">
-                                         {filters.segments.includes(s) ? <CheckSquare size={16} className="mr-2 text-indigo-600"/> : <Square size={16} className="mr-2 text-sle-neutral-300"/>}
-                                         {s}
-                                    </div>
+                        <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-sle-neutral-100 z-[100] p-3 animate-in fade-in zoom-in-95 duration-200">
+                            
+                            {/* Atalhos de Grupo */}
+                            <div className="grid grid-cols-3 gap-2 mb-3 pb-3 border-b border-sle-neutral-100">
+                                <button onClick={() => toggleStatusGroup('active')} className="flex flex-col items-center p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors">
+                                    <CheckCircle2 size={16} />
+                                    <span className="text-[9px] font-bold uppercase mt-1">Ativos</span>
                                 </button>
-                            ))}
+                                <button onClick={() => toggleStatusGroup('risk')} className="flex flex-col items-center p-2 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors">
+                                    <Filter size={16} />
+                                    <span className="text-[9px] font-bold uppercase mt-1">Risco</span>
+                                </button>
+                                <button onClick={() => toggleStatusGroup('inactive')} className="flex flex-col items-center p-2 rounded-lg hover:bg-rose-50 text-rose-600 transition-colors">
+                                    <Trash2 size={16} />
+                                    <span className="text-[9px] font-bold uppercase mt-1">Inativos</span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
+                                {Object.values(Segment).map(s => (
+                                    <button key={s} onClick={() => toggleSegment(s)} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex justify-between items-center transition-all cursor-pointer active:scale-[0.98] ${filters.segments.includes(s) ? 'bg-indigo-50 text-indigo-700' : 'text-sle-neutral-600 hover:bg-sle-neutral-50'}`}>
+                                        <div className="flex items-center">
+                                            {filters.segments.includes(s) ? <CheckSquare size={16} className="mr-2 text-indigo-600"/> : <Square size={16} className="mr-2 text-sle-neutral-300"/>}
+                                            {s}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </>
                 )}

@@ -221,13 +221,18 @@ const calculateProjections = (
       });
   });
 
-  // Projeção Simples (Média Móvel + Sazonalidade Básica)
+  // Projeção CONSERVADORA (Safety Margin + Sazonalidade Suavizada)
   const lastRealKey = sortedKeys[sortedKeys.length - 1];
   let [py, pm] = lastRealKey ? lastRealKey.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
   
   const last3 = chartPoints.slice(-3);
   const avg = last3.reduce((acc, p) => acc + (p.revenue || 0), 0) / Math.max(1, last3.length);
-  let baseValue = avg || 0;
+  
+  // Lógica Conservadora:
+  // 1. Safety Margin: Reduz a base de cálculo em 5% para evitar otimismo baseada em picos recentes.
+  // 2. Growth Flat: Assume crescimento orgânico quase nulo (0.1% a.m) para ser conservador.
+  const safetyMargin = 0.95; 
+  let baseValue = (avg || 0) * safetyMargin;
 
   // Link visual
   if (chartPoints.length > 0) {
@@ -239,13 +244,16 @@ const calculateProjections = (
       if (pm > 12) { pm = 1; py++; }
       const mIndex = pm - 1;
       
-      // Fatores de Sazonalidade Típicos de Transporte
+      // Fatores de Sazonalidade Típicos de Transporte (SUAVIZADOS)
+      // Reduzimos os picos para manter a projeção conservadora.
       let seasonFactor = 1.0;
-      if (mIndex === 9 || mIndex === 10) seasonFactor = 1.15; // Black Friday / Estoque Natal
-      if (mIndex === 11) seasonFactor = 1.10; 
-      if (mIndex === 0) seasonFactor = 0.85; 
-      
-      baseValue = baseValue * 1.005; 
+      if (mIndex === 9 || mIndex === 10) seasonFactor = 1.08; // De 1.15 para 1.08 (Black Friday/Natal conservador)
+      if (mIndex === 11) seasonFactor = 1.05; // De 1.10 para 1.05
+      if (mIndex === 0) seasonFactor = 0.88; // Janeiro (Queda típica, mantida)
+      if (mIndex === 1) seasonFactor = 0.92; // Fevereiro (Curto)
+
+      // Crescimento Conservador (0.1% ao mês)
+      baseValue = baseValue * 1.001; 
       const val = baseValue * seasonFactor;
 
       const pDate = new Date(py, pm - 1, 1);
