@@ -1,5 +1,5 @@
 import { Client, Segment, ABCCategory, HealthScore, FilterState, ProcessResult, OpportunityTag, ChartDataPoint, ClientAlert } from "../types";
-import { parseISO, differenceInDays, format } from 'date-fns';
+import { parseISO, differenceInDays, format, subMonths, addMonths, isAfter, isBefore, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // URL da Planilha Pública (Exportação CSV)
@@ -11,18 +11,22 @@ const GOOGLE_SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}
 
 const parseCurrency = (value: string): number => {
   if (!value) return 0;
-  const cleanStr = value.replace(/["'R$\s.]/g, '').replace(',', '.');
-  return parseFloat(cleanStr) || 0;
+  // Remove R$, espaços e converte vírgula decimal para ponto
+  const cleanStr = value.replace(/["'R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+  const floatVal = parseFloat(cleanStr);
+  return isNaN(floatVal) ? 0 : floatVal;
 };
 
 const parseDateToString = (dateStr: string): string | null => {
   if (!dateStr) return null;
-  let clean = dateStr.trim().replace(/"/g, '');
+  let clean = dateStr.trim().replace(/["']/g, '');
   
   if (clean.includes(' ')) {
       clean = clean.split(' ')[0];
   }
-  
+
+  // Tentar formatos comuns
+  // DD/MM/YYYY ou DD/MM/YY
   if (clean.includes('/')) {
     const parts = clean.split('/');
     if (parts.length === 3) {
@@ -30,6 +34,7 @@ const parseDateToString = (dateStr: string): string | null => {
       const month = parseInt(parts[1], 10);
       let year = parseInt(parts[2], 10);
       
+      // Ajuste ano 2 dígitos
       if (year < 100) year += 2000;
 
       if (day > 0 && day <= 31 && month > 0 && month <= 12 && year > 1990 && year < 2100) {
@@ -37,6 +42,7 @@ const parseDateToString = (dateStr: string): string | null => {
       }
     }
   } 
+  // YYYY-MM-DD
   else if (clean.includes('-')) {
     const parts = clean.split('-');
     if (parts.length === 3 && parts[0].length === 4) {
@@ -70,18 +76,12 @@ const splitCSVLine = (line: string): string[] => {
 // --- FETCH ---
 export const fetchGoogleSheetData = async (): Promise<Client[]> => {
   try {
-    console.log("Fetching data from Google Sheets...");
     const response = await fetch(GOOGLE_SHEET_CSV_URL);
-    
-    if (!response.ok) {
-      throw new Error(`Erro ao acessar planilha: ${response.statusText}`);
-    }
-    
+    if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
     const csvText = await response.text();
     return parseCSVText(csvText);
-
   } catch (error) {
-    console.error("Falha no carregamento automático:", error);
+    console.error("Falha ao carregar planilha:", error);
     return []; 
   }
 };
@@ -94,6 +94,7 @@ export const parseCSVData = async (file: File): Promise<Client[]> => {
 const parseCSVText = (text: string): Client[] => {
   const lines = text.split(/\r\n|\n/);
   const clientsMap = new Map<string, Partial<Client>>();
+  const nowStr = new Date().toISOString().split('T')[0];
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
@@ -109,8 +110,9 @@ const parseCSVText = (text: string): Client[] => {
     const cnpj = cols[4];
     const name = cols[5] || cnpj;
 
-    if (!cnpj || cnpj === 'N/I') continue;
+    if (!cnpj || cnpj === 'N/I' || cnpj.length < 5) continue;
 
+    // Chave única sanitizada
     const cleanCnpj = cnpj.replace(/\D/g, '');
     const clientKey = cleanCnpj || cnpj;
 
@@ -122,13 +124,14 @@ const parseCSVText = (text: string): Client[] => {
         history: [], 
         origin: [],
         destination: [],
-        firstShipmentDate: undefined, 
-        lastShipmentDate: undefined
+        // Inicializa com datas extremas para serem sobrescritas
+        firstShipmentDate: '2099-12-31', 
+        lastShipmentDate: '2000-01-01'
       });
     }
 
     const client = clientsMap.get(clientKey)!;
-    const dateIsoString = parseDateToString(dateStr); // YYYY-MM-DD
+    const dateIsoString = parseDateToString(dateStr); 
     
     if (dateIsoString) {
         const [yStr, mStr] = dateIsoString.split('-');
@@ -144,10 +147,10 @@ const parseCSVText = (text: string): Client[] => {
             month: month
         });
 
-        if (!client.lastShipmentDate || dateIsoString > client.lastShipmentDate) {
+        if (client.lastShipmentDate && dateIsoString > client.lastShipmentDate) {
             client.lastShipmentDate = dateIsoString;
         }
-        if (!client.firstShipmentDate || dateIsoString < client.firstShipmentDate) {
+        if (client.firstShipmentDate && dateIsoString < client.firstShipmentDate) {
             client.firstShipmentDate = dateIsoString;
         }
     }
@@ -156,12 +159,14 @@ const parseCSVText = (text: string): Client[] => {
     if (destination && destination !== 'N/A' && !client.destination?.includes(destination)) client.destination?.push(destination);
   }
 
+  // Pós-processamento para garantir integridade
   const clients: Client[] = Array.from(clientsMap.values()).map(c => {
       const cl = c as Client;
-      const nowStr = new Date().toISOString().split('T')[0];
-      if (!cl.lastShipmentDate) cl.lastShipmentDate = nowStr;
-      if (!cl.firstShipmentDate) cl.firstShipmentDate = nowStr;
       
+      // Fallback se não encontrou datas válidas
+      if (cl.firstShipmentDate === '2099-12-31') cl.firstShipmentDate = nowStr;
+      if (cl.lastShipmentDate === '2000-01-01') cl.lastShipmentDate = nowStr;
+
       return {
           ...cl,
           totalRevenue: 0, 
@@ -186,7 +191,7 @@ export const generateMockData = async (): Promise<Client[]> => {
   return [];
 };
 
-// --- OTIMIZAÇÃO DO PROCESSAMENTO ---
+// --- CÁLCULO DE PROJEÇÕES (12 MESES HIST + 12 PROJ) ---
 
 const calculateProjections = (
   historicalData: {date: string, value: number}[], 
@@ -194,94 +199,84 @@ const calculateProjections = (
 ): ChartDataPoint[] => {
   if (historicalData.length < 1) return [];
 
-  // Ordenar para o gráfico linear
-  const sorted = historicalData.sort((a, b) => a.date.localeCompare(b.date));
-  const chartPoints: ChartDataPoint[] = [];
-
+  // 1. Agrupar por Mês
   const monthlyReal = new Map<string, number>();
-  sorted.forEach(d => {
+  historicalData.forEach(d => {
       const key = d.date.substring(0, 7); // YYYY-MM
       const val = monthlyReal.get(key) || 0;
       monthlyReal.set(key, val + d.value);
   });
 
   const sortedKeys = Array.from(monthlyReal.keys()).sort();
+  const maxDate = parseISO(maxDateStr);
   
-  // Construir pontos históricos
+  // 2. Definir janela de 12 meses atrás a partir da Data de Referência
+  const twelveMonthsAgo = subMonths(maxDate, 12);
+  const chartPoints: ChartDataPoint[] = [];
+
+  // Filtrar apenas os últimos 12 meses para o gráfico
   sortedKeys.forEach(key => {
       const [y, m] = key.split('-').map(Number);
       const dateObj = new Date(y, m - 1, 1);
-      chartPoints.push({
-          name: format(dateObj, 'MMM/yy', { locale: ptBR }),
-          date: key,
-          revenue: monthlyReal.get(key) || 0,
-          projectedRevenue: null,
-          isProjection: false
-      });
+      
+      if (isAfter(dateObj, twelveMonthsAgo) || key === maxDateStr.substring(0, 7)) {
+          chartPoints.push({
+              name: format(dateObj, 'MMM/yy', { locale: ptBR }),
+              date: key,
+              revenue: monthlyReal.get(key) || 0,
+              projectedRevenue: null,
+              isProjection: false
+          });
+      }
   });
 
   // --- LÓGICA DE PROJEÇÃO CONSERVADORA ---
-  // Baseada em média ponderada dos últimos 6 meses para maior estabilidade
-  const historyLen = chartPoints.length;
+  // Base: Média ponderada dos últimos 6 meses disponíveis
+  const historyLen = sortedKeys.length;
   const monthsToConsider = Math.min(6, historyLen);
   let weightedSum = 0;
   let weightTotal = 0;
 
+  // Pegar os ultimos X meses reais (independente se entraram no gráfico ou não)
   for (let i = 0; i < monthsToConsider; i++) {
-      const point = chartPoints[historyLen - 1 - i];
-      const weight = monthsToConsider - i; // Meses mais recentes têm mais peso
-      weightedSum += (point.revenue || 0) * weight;
+      const key = sortedKeys[historyLen - 1 - i];
+      const val = monthlyReal.get(key) || 0;
+      const weight = monthsToConsider - i; 
+      weightedSum += val * weight;
       weightTotal += weight;
   }
 
   const weightedAvg = weightTotal > 0 ? weightedSum / weightTotal : 0;
-
-  // Safety Margin: Reduz a base de previsão em 15% para garantir conservadorismo
-  const SAFETY_MARGIN = 0.85; 
+  const SAFETY_MARGIN = 0.85; // Margem de segurança de 15%
   let baseValue = weightedAvg * SAFETY_MARGIN;
 
   // Data Inicial para Projeção
   const lastRealKey = sortedKeys[sortedKeys.length - 1];
   let [py, pm] = lastRealKey ? lastRealKey.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
 
-  // Link visual: O último ponto real conecta com a projeção
+  // Link visual
   if (chartPoints.length > 0) {
       chartPoints[chartPoints.length - 1].projectedRevenue = chartPoints[chartPoints.length - 1].revenue;
   }
 
-  // Gerar 12 meses de projeção
+  // Gerar 12 meses futuros
   for (let i = 1; i <= 12; i++) {
       pm++;
       if (pm > 12) { pm = 1; py++; }
-      const mIndex = pm - 1; // 0 = Jan, 11 = Dez
+      const mIndex = pm - 1; 
       
-      // Sazonalidade Detalhada (Perfil Logístico Conservador)
+      // Sazonalidade Típica (Conservadora)
       let seasonFactor = 1.0;
-
-      // Q1: Baixa tradicional (Jan/Fev)
       if (mIndex === 0) seasonFactor = 0.85; // Jan
-      else if (mIndex === 1) seasonFactor = 0.88; // Fev (Curto)
+      else if (mIndex === 1) seasonFactor = 0.88; // Fev
       else if (mIndex === 2) seasonFactor = 1.00; // Mar
-
-      // Q2: Recuperação
-      else if (mIndex === 3) seasonFactor = 1.02; // Abr
-      else if (mIndex === 4) seasonFactor = 1.03; // Mai
-      else if (mIndex === 5) seasonFactor = 1.00; // Jun
-
-      // Q3: Estabilidade
-      else if (mIndex === 6) seasonFactor = 1.02; // Jul
-      else if (mIndex === 7) seasonFactor = 1.04; // Ago
-      else if (mIndex === 8) seasonFactor = 1.03; // Set
-
-      // Q4: Alta (Black Friday/Natal), mas suavizada para conservadorismo
-      else if (mIndex === 9) seasonFactor = 1.08; // Out (Pre-season)
-      else if (mIndex === 10) seasonFactor = 1.12; // Nov (Peak)
-      else if (mIndex === 11) seasonFactor = 1.06; // Dez (Começo forte, fim fraco)
+      else if (mIndex === 9) seasonFactor = 1.05; // Out
+      else if (mIndex === 10) seasonFactor = 1.10; // Nov
+      else if (mIndex === 11) seasonFactor = 1.05; // Dez
       
-      // Aplicação da Sazonalidade
       const val = baseValue * seasonFactor;
-
       const pDate = new Date(py, pm - 1, 1);
+      
       chartPoints.push({
           name: format(pDate, 'MMM/yy', { locale: ptBR }),
           date: `${py}-${String(pm).padStart(2, '0')}`,
@@ -294,63 +289,52 @@ const calculateProjections = (
   return chartPoints;
 };
 
-// --- DETECÇÃO DE ANOMALIAS (Curva A Ativa) ---
+// --- ALERTAS ---
 export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
     const alerts: ClientAlert[] = [];
+    
+    // Filtrar clientes ativos e relevantes
+    const activeRelevant = clients.filter(c => c.recency <= 45 && c.totalRevenue > 0);
 
-    // Focar APENAS em Curva A que possui Fluxo Ativo (Recência <= 30 dias)
-    const topActiveClients = clients.filter(c => 
-        c.abcCategory === ABCCategory.A && 
-        c.recency <= 30
-    );
-
-    topActiveClients.forEach(client => {
-        const sortedHistory = [...client.history].sort((a, b) => a.date.localeCompare(b.date));
-        
-        // 1. Anomalia de Ticket (Média dos últimos 3 envios vs Média Global)
-        const last3Shipments = sortedHistory.slice(-3);
-        
-        if (last3Shipments.length > 0 && client.averageTicket > 0) {
-            const last3Avg = last3Shipments.reduce((sum, item) => sum + item.value, 0) / last3Shipments.length;
-            
-            // Se a média recente for < 70% da média global (queda significativa)
-            if (last3Avg < (client.averageTicket * 0.7)) {
-                 const percentDrop = ((client.averageTicket - last3Avg) / client.averageTicket) * 100;
-                 alerts.push({
-                    id: `alert-${client.id}-ticket`,
-                    clientId: client.id,
-                    clientName: client.name,
-                    type: 'ticket_drop',
-                    severity: 'high',
-                    metric: `-${percentDrop.toFixed(0)}%`,
-                    message: `Queda abrupta no ticket médio (últimos 3 envios).`,
-                    client: client
-                 });
+    activeRelevant.forEach(client => {
+        // Alerta de Queda de Ticket (Curva A ou B)
+        if (client.abcCategory === ABCCategory.A || client.abcCategory === ABCCategory.B) {
+            const history = client.history.sort((a,b) => a.date.localeCompare(b.date));
+            const last3 = history.slice(-3);
+            if (last3.length === 3) {
+                const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / 3;
+                if (recentAvg < (client.averageTicket * 0.7)) {
+                    alerts.push({
+                        id: `tk-${client.id}`,
+                        clientId: client.id,
+                        clientName: client.name,
+                        client: client,
+                        type: 'ticket_drop',
+                        severity: 'high',
+                        metric: `-${Math.round((1 - recentAvg/client.averageTicket)*100)}%`,
+                        message: 'Ticket médio caiu drasticamente nos últimos 3 envios.'
+                    });
+                }
             }
         }
-
-        // 2. Anomalia de Frequência (Quebra de Padrão)
-        if (sortedHistory.length > 5) {
-            const firstDate = parseISO(sortedHistory[0].date);
-            const lastDate = parseISO(sortedHistory[sortedHistory.length - 1].date);
-            const daysSpan = differenceInDays(lastDate, firstDate);
-            const avgInterval = Math.max(1, daysSpan / (sortedHistory.length - 1));
-            
-            // Tolerância: 3x o intervalo normal ou mínimo de 10 dias para Curva A
-            const threshold = Math.max(10, avgInterval * 3);
-
-            if (client.recency > threshold) {
-                alerts.push({
-                    id: `alert-${client.id}-freq`,
+        
+        // Alerta de Interrupção de Fluxo (Baseado na frequência média)
+        if (client.frequency > 5) {
+             // Estimativa simples de intervalo médio
+             const estimatedInterval = 365 / Math.max(1, client.frequency * (365/Math.max(1, differenceInDays(parseISO(client.lastShipmentDate), parseISO(client.firstShipmentDate)))));
+             // Se recência > 3x o intervalo normal
+             if (client.recency > Math.max(15, estimatedInterval * 3)) {
+                 alerts.push({
+                    id: `fq-${client.id}`,
                     clientId: client.id,
                     clientName: client.name,
+                    client: client,
                     type: 'frequency_drop',
                     severity: 'medium',
                     metric: `${client.recency}d`,
-                    message: `Interrupção no fluxo (esperado a cada ~${avgInterval.toFixed(0)}d).`,
-                    client: client
+                    message: `Cliente fora do padrão habitual de envio (~${Math.round(estimatedInterval)}d).`
                  });
-            }
+             }
         }
     });
 
@@ -368,22 +352,23 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       };
   }
 
-  // Sets para lookup rápido
-  const filterYearsSet = new Set(filters.years);
-  const filterMonthsSet = new Set(filters.months);
-  const filterClientsSet = new Set(filters.clients);
-  const filterOriginsSet = new Set(filters.origins);
-  const filterDestinationsSet = new Set(filters.destinations);
-  const filterSegmentsSet = new Set(filters.segments);
+  // --- FILTRAGEM EFICIENTE (Memoization manual) ---
+  // Apenas recalcular se necessário. Aqui fazemos direto pois a função é chamada via useMemo no App.tsx
+  const hasYearFilter = filters.years.length > 0;
+  const hasMonthFilter = filters.months.length > 0;
+  const hasClientFilter = filters.clients.length > 0;
+  const hasOriginFilter = filters.origins.length > 0;
+  const hasDestFilter = filters.destinations.length > 0;
+  const hasSegmentFilter = filters.segments.length > 0;
 
-  const hasYearFilter = filterYearsSet.size > 0;
-  const hasMonthFilter = filterMonthsSet.size > 0;
-  const hasClientFilter = filterClientsSet.size > 0;
-  const hasOriginFilter = filterOriginsSet.size > 0;
-  const hasDestFilter = filterDestinationsSet.size > 0;
-  const hasSegmentFilter = filterSegmentsSet.size > 0;
+  const yearsSet = new Set(filters.years);
+  const monthsSet = new Set(filters.months);
+  const clientsSet = new Set(filters.clients);
+  const originsSet = new Set(filters.origins);
+  const destSet = new Set(filters.destinations);
+  const segmentsSet = new Set(filters.segments);
 
-  // Determinar Data Referência Global
+  // Determinar Data de Referência (A mais recente de TODA a base)
   let maxDateStr = "2000-01-01";
   const allOrigins = new Set<string>();
   const allDestinations = new Set<string>();
@@ -398,89 +383,86 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
   const processedClients: Client[] = [];
   const globalFilteredHistory: {date: string, value: number}[] = [];
 
-  // Loop Principal
-  for (let i = 0; i < allClients.length; i++) {
-      const client = allClients[i];
-
-      if (hasClientFilter && !filterClientsSet.has(client.id)) continue;
+  for (const client of allClients) {
+      // 1. Filtro de Cliente (Rápido)
+      if (hasClientFilter && !clientsSet.has(client.id)) continue;
 
       let filteredRevenue = 0;
       let filteredShipments = 0;
-      const currentClientHistory: {date: string, value: number}[] = [];
+      const historyFiltered: typeof client.history = [];
 
-      const history = client.history;
-      for (let j = 0; j < history.length; j++) {
-          const t = history[j];
-          
-          if (hasYearFilter && !filterYearsSet.has(t.year)) continue;
-          if (hasMonthFilter && !filterMonthsSet.has(t.month)) continue;
-          if (hasOriginFilter && !filterOriginsSet.has(t.origin)) continue;
-          if (hasDestFilter && !filterDestinationsSet.has(t.destination)) continue;
+      // 2. Filtros de Transação (Ano, Mês, Rota)
+      for (const t of client.history) {
+          if (hasYearFilter && !yearsSet.has(t.year)) continue;
+          if (hasMonthFilter && !monthsSet.has(t.month)) continue;
+          if (hasOriginFilter && !originsSet.has(t.origin)) continue;
+          if (hasDestFilter && !destSet.has(t.destination)) continue;
 
           filteredRevenue += t.value;
           filteredShipments++;
-          currentClientHistory.push({ date: t.date, value: t.value });
+          historyFiltered.push(t);
+          globalFilteredHistory.push({ date: t.date, value: t.value });
       }
 
-      // Se aplicou filtros temporais e não tem resultado, pula (mas mantém se for só filtro de cliente)
-      if (filteredRevenue === 0 && (hasYearFilter || hasMonthFilter)) {
-           continue;
+      // Se aplicou filtros e não sobrou nada, ignora (exceto se for apenas filtro de cliente, onde queremos ver o cadastro)
+      if (filteredShipments === 0 && (hasYearFilter || hasMonthFilter || hasOriginFilter || hasDestFilter)) {
+          continue;
       }
 
-      for(let k=0; k<currentClientHistory.length; k++) {
-          globalFilteredHistory.push(currentClientHistory[k]);
-      }
-
-      // Métricas Globais (independente do filtro temporal para segmentação correta)
+      // --- CÁLCULO DE SEGMENTAÇÃO (CORRIGIDO) ---
+      // Usamos os dados GLOBAIS do cliente (não filtrados) para definir quem ele é
+      // A segmentação reflete o STATUS ATUAL DO CLIENTE, independente do filtro de mês visualizado
       const daysSinceLastGlobal = differenceInDays(referenceDate, parseISO(client.lastShipmentDate));
       const daysSinceFirstGlobal = differenceInDays(referenceDate, parseISO(client.firstShipmentDate));
-      
+
+      let segment = Segment.POTENTIAL;
+
+      // HIERARQUIA DE STATUS (Prioridade para Inatividade)
+      if (daysSinceLastGlobal > 180) {
+          segment = Segment.LOST; // Inativo > 6 meses
+      } else if (daysSinceLastGlobal > 90) {
+          segment = Segment.AT_RISK; // Inativo > 3 meses (Risco)
+      } else {
+          // Cliente ATIVO (Comprou nos últimos 90 dias)
+          // Só aqui verificamos se é novo
+          if (daysSinceFirstGlobal <= 90) {
+              segment = Segment.NEW; // Começou a comprar agora
+          } else {
+              // Ativo e antigo
+              segment = Segment.LOYAL; 
+              // Regra de Campeão (Simplificada)
+              const globalRevenue = client.history.reduce((acc, h) => acc + h.value, 0);
+              if (globalRevenue > 100000) segment = Segment.CHAMPIONS;
+          }
+      }
+
+      // 3. Filtro de Segmento (Aplica após calcular)
+      if (hasSegmentFilter && !segmentsSet.has(segment)) continue;
+
       // Score de Saúde
       let score = 50;
-      if (daysSinceLastGlobal <= 30) score += 40;
-      else if (daysSinceLastGlobal <= 60) score += 20;
-      else if (daysSinceLastGlobal > 90) score -= 30;
-
-      const globalTotal = client.history.reduce((acc,t) => acc + t.value, 0);
-      const globalCount = client.history.length;
-      const globalTicket = globalCount > 0 ? globalTotal/globalCount : 0;
-      
-      if (globalTicket > 5000) score += 10;
-      score = Math.max(0, Math.min(100, score));
-
+      if (segment === Segment.LOST) score = 10;
+      else if (segment === Segment.AT_RISK) score = 30;
+      else {
+          score = 70;
+          if (daysSinceLastGlobal < 15) score += 10;
+          if (segment === Segment.CHAMPIONS) score += 15;
+          if (segment === Segment.NEW) score += 5;
+      }
       let health = HealthScore.WARNING;
       if (score >= 80) health = HealthScore.EXCELLENT;
       else if (score >= 60) health = HealthScore.GOOD;
       else if (score <= 30) health = HealthScore.CRITICAL;
 
-      // --- LÓGICA DE SEGMENTAÇÃO CORRIGIDA ---
-      // Prioridade: Inatividade > Tempo de Cadastro
-      let segment = Segment.POTENTIAL;
-
-      if (daysSinceLastGlobal > 180) {
-        segment = Segment.LOST;
-      } else if (daysSinceLastGlobal > 90) {
-        segment = Segment.AT_RISK;
-      } else {
-        // Cliente está ATIVO (Recência <= 90 dias)
-        // Só agora verificamos se é novo
-        if (daysSinceFirstGlobal <= 90) { 
-            segment = Segment.NEW;
-        } else {
-            // Ativo e antigo
-            segment = Segment.LOYAL;
-        }
-      }
-
-      if (hasSegmentFilter && !filterSegmentsSet.has(segment)) {
-          continue;
-      }
-
+      // Tags de Oportunidade
       let opportunityTag: OpportunityTag = null;
-      if (daysSinceLastGlobal > 90) {
-          if (globalTicket > 10000) opportunityTag = 'Frete Premium';
-          else if (globalTotal > 50000) opportunityTag = 'Alto Volume';
-          else if (globalCount > 20) opportunityTag = 'Recuperável';
+      if (segment === Segment.AT_RISK || segment === Segment.LOST) {
+           const globalRev = client.history.reduce((acc, h) => acc + h.value, 0);
+           const avgTicket = client.history.length > 0 ? globalRev / client.history.length : 0;
+           
+           if (avgTicket > 5000) opportunityTag = 'Frete Premium';
+           else if (globalRev > 50000) opportunityTag = 'Alto Volume';
+           else if (client.history.length > 10) opportunityTag = 'Recuperável';
       }
 
       processedClients.push({
@@ -492,34 +474,33 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           frequency: filteredShipments,
           averageTicket: filteredShipments > 0 ? filteredRevenue / filteredShipments : 0,
           segment,
-          abcCategory: ABCCategory.C, 
+          abcCategory: ABCCategory.C, // Será recalculado
           healthScore: health,
-          healthValue: Math.floor(score),
+          healthValue: score,
           opportunityTag
       });
   }
 
+  // Ordenar e Recalcular Curva ABC na lista filtrada
   processedClients.sort((a, b) => b.totalRevenue - a.totalRevenue);
-  
-  // Cálculo Curva ABC
   const totalRev = processedClients.reduce((acc, c) => acc + c.totalRevenue, 0);
   let accum = 0;
-  for(let i=0; i<processedClients.length; i++) {
-      const c = processedClients[i];
+  
+  processedClients.forEach(c => {
       accum += c.totalRevenue;
       const p = totalRev > 0 ? accum / totalRev : 1;
-      if (p <= 0.8) c.abcCategory = ABCCategory.A;
+      if (p <= 0.80) c.abcCategory = ABCCategory.A;
       else if (p <= 0.95) c.abcCategory = ABCCategory.B;
       else c.abcCategory = ABCCategory.C;
-  }
+  });
 
   const chartData = calculateProjections(globalFilteredHistory, maxDateStr);
 
   return {
-    referenceDate,
-    clients: processedClients,
-    chartData,
-    availableOrigins: Array.from(allOrigins).sort(),
-    availableDestinations: Array.from(allDestinations).sort()
+      clients: processedClients,
+      chartData,
+      referenceDate,
+      availableOrigins: Array.from(allOrigins).sort(),
+      availableDestinations: Array.from(allDestinations).sort()
   };
 };

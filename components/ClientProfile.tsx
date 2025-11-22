@@ -4,7 +4,7 @@ import {
   ArrowLeft, TrendingUp, Package, DollarSign, 
   BrainCircuit, AlertTriangle, Clock, Loader2, MoreHorizontal, 
   ArrowUpRight, ArrowDownRight, Calendar, ShieldCheck, Zap, Sparkles, MapPin, Route,
-  FileText, Plus, Check, X, Ban, History
+  FileText, Plus, Check, X, Ban, History, PenTool
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
@@ -85,6 +85,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
+    // Exibir apenas últimos 12 meses
     return data.slice(-12);
   }, [client]);
 
@@ -219,12 +220,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
               {client.name}
               {client.justification ? (
                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1">
-                    <Ban size={10} /> Inativo Justificado
+                    <Ban size={10} /> {client.justification.reason}
                  </span>
               ) : (
                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider ${
                     client.segment === Segment.LOST ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' :
                     client.segment === Segment.AT_RISK ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                    client.segment === Segment.NEW ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
                     'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
                 }`}>
                     {client.segment}
@@ -244,12 +246,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           </div>
         </div>
         <div className="flex items-center gap-3">
-            {!client.justification && (client.segment === Segment.AT_RISK || client.segment === Segment.LOST) && (
+             {/* BOTÃO JUSTIFICAR AGORA SEMPRE DISPONÍVEL SE NÃO HOUVER JUSTIFICATIVA AINDA E ESTIVER INATIVO > 30d */}
+            {!client.justification && client.recency > 30 && (
                 <button 
                     onClick={() => setShowJustifyForm(true)}
-                    className="hidden sm:flex px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer"
                 >
-                    Justificar Inatividade
+                    <PenTool size={12} />
+                    Justificar
                 </button>
             )}
              <div className="hidden sm:flex flex-col items-end ml-4 border-l border-sle-neutral-200 dark:border-sle-blue-800 pl-4">
@@ -552,14 +556,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                     </div>
 
                     {client.justification && (
-                        <div className="mt-6 pt-4 border-t border-sle-neutral-100 dark:border-sle-blue-800">
-                            <h5 className="text-xs font-bold text-sle-neutral-900 dark:text-white mb-2">Justificativa de Inatividade</h5>
-                            <div className="p-3 bg-slate-50 dark:bg-sle-blue-950 rounded-xl border border-slate-100 dark:border-sle-blue-800">
-                                <p className="text-xs font-semibold text-slate-700 dark:text-sle-blue-200">{client.justification.reason}</p>
+                        <div className="mt-6 pt-4 border-t border-sle-neutral-100 dark:border-sle-blue-800 animate-in slide-in-from-top-2">
+                            <h5 className="text-xs font-bold text-sle-neutral-900 dark:text-white mb-2 flex items-center gap-1"><Ban size={12}/> Justificativa Ativa</h5>
+                            <div className="p-3 bg-rose-50 dark:bg-rose-900/10 rounded-xl border border-rose-100 dark:border-rose-800">
+                                <p className="text-xs font-bold text-rose-700 dark:text-rose-300">{client.justification.reason}</p>
                                 {client.justification.newCnpj && (
-                                    <p className="text-[10px] text-slate-500 dark:text-sle-blue-400 mt-1 font-mono">Novo CNPJ: {client.justification.newCnpj}</p>
+                                    <p className="text-[10px] text-rose-600 dark:text-rose-400 mt-1 font-mono">Novo CNPJ: {client.justification.newCnpj}</p>
                                 )}
-                                <p className="text-[10px] text-slate-400 dark:text-sle-blue-500 mt-2 flex items-center gap-1">
+                                <p className="text-[10px] text-rose-500 dark:text-rose-500 mt-2 flex items-center gap-1 opacity-80">
                                     <Clock size={10} /> {format(parseISO(client.justification.date), 'dd/MM/yy')} por {client.justification.user}
                                 </p>
                             </div>
