@@ -1,6 +1,6 @@
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useEffect } from 'react';
 import { FilterState, Client, Segment } from '../types';
-import { Search, X, Check, Building2, MapPin, Navigation, Users, CheckSquare, Square, Trash2, CheckCircle2, CalendarRange, CalendarDays, ChevronDown, Fingerprint, Filter } from 'lucide-react';
+import { Search, X, Check, Building2, MapPin, Navigation, Users, CheckSquare, Square, Trash2, CheckCircle2, CalendarRange, CalendarDays, ChevronDown, Fingerprint, Filter, Loader2, AlertCircle } from 'lucide-react';
 
 interface FilterBarProps {
   clients: Client[];
@@ -18,11 +18,25 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
   availableDestinations = []
 }) => {
   const [clientSearch, setClientSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<'origin' | 'dest' | 'status' | null>(null);
   
   const [originSearch, setOriginSearch] = useState('');
   const [destSearch, setDestSearch] = useState('');
+
+  // Debounce effect for search
+  useEffect(() => {
+    if (clientSearch !== debouncedSearch) {
+        setIsSearching(true);
+        const handler = setTimeout(() => {
+            setDebouncedSearch(clientSearch);
+            setIsSearching(false);
+        }, 300);
+        return () => clearTimeout(handler);
+    }
+  }, [clientSearch]);
 
   const years = [2021, 2022, 2023, 2024, 2025];
   const months = [
@@ -33,7 +47,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
   ];
 
   const clientSuggestions = useMemo(() => {
-    const term = clientSearch.trim();
+    const term = debouncedSearch.trim();
     if (term.length < 2) return [];
     
     const searchLower = term.toLowerCase();
@@ -48,7 +62,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
         return nameMatch || cnpjRawMatch || cnpjFormattedMatch;
       })
       .slice(0, 10); 
-  }, [clients, clientSearch]);
+  }, [clients, debouncedSearch]);
 
   const filteredOrigins = useMemo(() => 
     availableOrigins.filter(o => o.toLowerCase().includes(originSearch.toLowerCase())),
@@ -70,6 +84,14 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
         ? filters.months.filter(m => m !== month)
         : [...filters.months, month];
     onFilterChange({ ...filters, months: newMonths });
+  }
+
+  const toggleAllMonths = () => {
+      if (filters.months.length === 12) {
+          onFilterChange({ ...filters, months: [] });
+      } else {
+          onFilterChange({ ...filters, months: [1,2,3,4,5,6,7,8,9,10,11,12] });
+      }
   }
 
   const addClient = (clientId: string) => {
@@ -157,7 +179,11 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
         <div className="lg:col-span-4 relative z-20 flex flex-col">
             <div className={`relative group transition-all duration-200 ${isSearchFocused ? 'scale-[1.02]' : ''}`}>
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Search size={18} className={`transition-colors duration-300 ${isSearchFocused ? 'text-indigo-500' : 'text-sle-neutral-400'}`} />
+                    {isSearching ? (
+                        <Loader2 size={18} className="text-indigo-500 animate-spin" />
+                    ) : (
+                        <Search size={18} className={`transition-colors duration-300 ${isSearchFocused ? 'text-indigo-500' : 'text-sle-neutral-400'}`} />
+                    )}
                 </div>
                 <input
                     type="text"
@@ -241,7 +267,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                             })
                         ) : (
                             <div className="p-8 text-center flex flex-col items-center">
-                                <Search size={24} className="mb-2 text-sle-neutral-300" />
+                                <AlertCircle size={24} className="mb-2 text-sle-neutral-300" />
                                 <span className="text-sm font-semibold text-sle-neutral-500">Nenhum cliente encontrado</span>
                             </div>
                         )}
@@ -435,9 +461,17 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
 
               {/* Months */}
               <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-3 text-sle-neutral-400">
-                      <CalendarDays size={14} strokeWidth={2.5} />
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Período (Mês)</span>
+                  <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 text-sle-neutral-400">
+                          <CalendarDays size={14} strokeWidth={2.5} />
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Período (Mês)</span>
+                      </div>
+                      <button 
+                        onClick={toggleAllMonths} 
+                        className="text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded transition-colors"
+                      >
+                        {filters.months.length === 12 ? 'Desmarcar Todos' : 'Ano Completo'}
+                      </button>
                   </div>
                   <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
                     {months.map(m => (

@@ -12,9 +12,12 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
   const [showJustified, setShowJustified] = useState(false);
 
   const { activeOpportunities, justifiedOpportunities } = useMemo(() => {
+    // Filtra clientes que estão inativos há mais de 90 dias
     const allOpp = clients.filter(c => c.recency > 90);
     
     const justified = allOpp.filter(c => !!c.justification);
+    
+    // Clientes ativos na lista são aqueles SEM justificativa
     const active = allOpp.filter(c => !c.justification).sort((a, b) => {
           const getTagWeight = (tag: string | undefined | null) => {
               if (tag === 'Frete Premium') return 4;

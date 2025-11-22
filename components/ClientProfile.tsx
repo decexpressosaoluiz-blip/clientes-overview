@@ -368,18 +368,21 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                                         if (active && payload && payload.length) {
                                             const data = payload[0].payload;
                                             return (
-                                                <div className="bg-sle-neutral-900 dark:bg-black text-white text-xs p-3 rounded-xl shadow-xl border border-sle-neutral-700/50 dark:border-sle-blue-800">
+                                                <div className="bg-sle-neutral-900 dark:bg-black text-white text-xs p-3 rounded-xl shadow-xl border border-sle-neutral-700/50 dark:border-sle-blue-800 min-w-[180px]">
                                                     <p className="font-bold mb-2 opacity-60 uppercase tracking-wider border-b border-white/10 pb-1">{data.fullDate}</p>
-                                                    <div className="space-y-1.5">
-                                                        <div className="flex justify-between gap-4">
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between gap-4 items-center">
                                                             <span className="text-sle-neutral-400">Receita:</span>
-                                                            <span className="font-bold text-emerald-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.value)}</span>
+                                                            <span className="font-bold text-emerald-400 text-sm">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.value)}</span>
                                                         </div>
-                                                        <div className="flex justify-between gap-4">
+                                                        <div className="flex justify-between gap-4 items-center">
                                                             <span className="text-sle-neutral-400">Envios:</span>
-                                                            <span className="font-bold text-white">{data.count}</span>
+                                                            <div className="flex items-center gap-1">
+                                                                <Package size={12} className="text-sle-neutral-500" />
+                                                                <span className="font-bold text-white">{data.count}</span>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex justify-between gap-4">
+                                                        <div className="flex justify-between gap-4 items-center pt-1 border-t border-white/10">
                                                             <span className="text-sle-neutral-400">Ticket Médio:</span>
                                                             <span className="font-bold text-indigo-300">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.avgTicket)}</span>
                                                         </div>

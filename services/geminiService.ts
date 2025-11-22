@@ -110,15 +110,15 @@ export const generateClientInsights = async (client: Client): Promise<InsightRes
     Gere EXATAMENTE 3 sugestões estruturadas JSON.
     
     Categorias permitidas e seus significados:
-    - 'opportunity': Use para "Expansão de Conta" ou "Oferta Complementar" (evite termos técnicos como Upsell/Cross-sell).
+    - 'opportunity': Use para "Expansão de Conta" ou "Oferta Complementar" (PROIBIDO usar Upsell/Cross-sell).
     - 'risk': Para risco de perda de cliente ou queda drástica de volume.
     - 'attention': Pontos de atenção operacionais ou mudanças de comportamento.
     - 'retention': Ações de fidelização e relacionamento.
 
     Regras de Texto:
-    1. Use linguagem simples e comercial.
-    2. Evite jargões como "Churn", "Upsell", "Cross-sell". 
-    3. Use "Risco de Perda", "Expansão", "Oferta Complementar".
+    1. Use linguagem simples, comercial e direta (Português BR).
+    2. PROIBIDO usar termos técnicos em inglês como "Churn", "Upsell", "Cross-sell".
+    3. Substitua por "Risco de Saída", "Expansão", "Oferta Complementar".
     
     Seja direto e acionável.
   `;

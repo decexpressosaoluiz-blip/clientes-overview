@@ -131,7 +131,6 @@ const parseCSVText = (text: string): Client[] => {
     const dateIsoString = parseDateToString(dateStr); // YYYY-MM-DD
     
     if (dateIsoString) {
-        // OTIMIZAÇÃO: Calcular ano e mês no parse inicial
         const [yStr, mStr] = dateIsoString.split('-');
         const year = parseInt(yStr, 10);
         const month = parseInt(mStr, 10);
@@ -195,7 +194,7 @@ const calculateProjections = (
 ): ChartDataPoint[] => {
   if (historicalData.length < 1) return [];
 
-  // Ordenar é necessário para o gráfico linear
+  // Ordenar para o gráfico linear
   const sorted = historicalData.sort((a, b) => a.date.localeCompare(b.date));
   const chartPoints: ChartDataPoint[] = [];
 
@@ -208,7 +207,7 @@ const calculateProjections = (
 
   const sortedKeys = Array.from(monthlyReal.keys()).sort();
   
-  // Converter Map para Array final
+  // Construir pontos históricos
   sortedKeys.forEach(key => {
       const [y, m] = key.split('-').map(Number);
       const dateObj = new Date(y, m - 1, 1);
@@ -221,39 +220,65 @@ const calculateProjections = (
       });
   });
 
-  // Projeção CONSERVADORA (Safety Margin + Sazonalidade Suavizada)
+  // --- LÓGICA DE PROJEÇÃO CONSERVADORA ---
+  // Baseada em média ponderada dos últimos 6 meses para maior estabilidade
+  const historyLen = chartPoints.length;
+  const monthsToConsider = Math.min(6, historyLen);
+  let weightedSum = 0;
+  let weightTotal = 0;
+
+  for (let i = 0; i < monthsToConsider; i++) {
+      const point = chartPoints[historyLen - 1 - i];
+      const weight = monthsToConsider - i; // Meses mais recentes têm mais peso
+      weightedSum += (point.revenue || 0) * weight;
+      weightTotal += weight;
+  }
+
+  const weightedAvg = weightTotal > 0 ? weightedSum / weightTotal : 0;
+
+  // Safety Margin: Reduz a base de previsão em 15% para garantir conservadorismo
+  const SAFETY_MARGIN = 0.85; 
+  let baseValue = weightedAvg * SAFETY_MARGIN;
+
+  // Data Inicial para Projeção
   const lastRealKey = sortedKeys[sortedKeys.length - 1];
   let [py, pm] = lastRealKey ? lastRealKey.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
-  
-  const last3 = chartPoints.slice(-3);
-  const avg = last3.reduce((acc, p) => acc + (p.revenue || 0), 0) / Math.max(1, last3.length);
-  
-  // Lógica Conservadora:
-  // 1. Safety Margin: Reduz a base de cálculo em 5% para evitar otimismo baseada em picos recentes.
-  // 2. Growth Flat: Assume crescimento orgânico quase nulo (0.1% a.m) para ser conservador.
-  const safetyMargin = 0.95; 
-  let baseValue = (avg || 0) * safetyMargin;
 
-  // Link visual
+  // Link visual: O último ponto real conecta com a projeção
   if (chartPoints.length > 0) {
       chartPoints[chartPoints.length - 1].projectedRevenue = chartPoints[chartPoints.length - 1].revenue;
   }
 
+  // Gerar 12 meses de projeção
   for (let i = 1; i <= 12; i++) {
       pm++;
       if (pm > 12) { pm = 1; py++; }
-      const mIndex = pm - 1;
+      const mIndex = pm - 1; // 0 = Jan, 11 = Dez
       
-      // Fatores de Sazonalidade Típicos de Transporte (SUAVIZADOS)
-      // Reduzimos os picos para manter a projeção conservadora.
+      // Sazonalidade Detalhada (Perfil Logístico Conservador)
       let seasonFactor = 1.0;
-      if (mIndex === 9 || mIndex === 10) seasonFactor = 1.08; // De 1.15 para 1.08 (Black Friday/Natal conservador)
-      if (mIndex === 11) seasonFactor = 1.05; // De 1.10 para 1.05
-      if (mIndex === 0) seasonFactor = 0.88; // Janeiro (Queda típica, mantida)
-      if (mIndex === 1) seasonFactor = 0.92; // Fevereiro (Curto)
 
-      // Crescimento Conservador (0.1% ao mês)
-      baseValue = baseValue * 1.001; 
+      // Q1: Baixa tradicional (Jan/Fev)
+      if (mIndex === 0) seasonFactor = 0.85; // Jan
+      else if (mIndex === 1) seasonFactor = 0.88; // Fev (Curto)
+      else if (mIndex === 2) seasonFactor = 1.00; // Mar
+
+      // Q2: Recuperação
+      else if (mIndex === 3) seasonFactor = 1.02; // Abr
+      else if (mIndex === 4) seasonFactor = 1.03; // Mai
+      else if (mIndex === 5) seasonFactor = 1.00; // Jun
+
+      // Q3: Estabilidade
+      else if (mIndex === 6) seasonFactor = 1.02; // Jul
+      else if (mIndex === 7) seasonFactor = 1.04; // Ago
+      else if (mIndex === 8) seasonFactor = 1.03; // Set
+
+      // Q4: Alta (Black Friday/Natal), mas suavizada para conservadorismo
+      else if (mIndex === 9) seasonFactor = 1.08; // Out (Pre-season)
+      else if (mIndex === 10) seasonFactor = 1.12; // Nov (Peak)
+      else if (mIndex === 11) seasonFactor = 1.06; // Dez (Começo forte, fim fraco)
+      
+      // Aplicação da Sazonalidade
       const val = baseValue * seasonFactor;
 
       const pDate = new Date(py, pm - 1, 1);
@@ -283,13 +308,12 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
         const sortedHistory = [...client.history].sort((a, b) => a.date.localeCompare(b.date));
         
         // 1. Anomalia de Ticket (Média dos últimos 3 envios vs Média Global)
-        // Usar últimos 3 evita alertas falsos por um envio pequeno isolado.
         const last3Shipments = sortedHistory.slice(-3);
         
         if (last3Shipments.length > 0 && client.averageTicket > 0) {
             const last3Avg = last3Shipments.reduce((sum, item) => sum + item.value, 0) / last3Shipments.length;
             
-            // Se a média recente for < 70% da média global (queda de 30%)
+            // Se a média recente for < 70% da média global (queda significativa)
             if (last3Avg < (client.averageTicket * 0.7)) {
                  const percentDrop = ((client.averageTicket - last3Avg) / client.averageTicket) * 100;
                  alerts.push({
@@ -299,23 +323,23 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
                     type: 'ticket_drop',
                     severity: 'high',
                     metric: `-${percentDrop.toFixed(0)}%`,
-                    message: `Queda no ticket médio (últimos 3 envios).`,
+                    message: `Queda abrupta no ticket médio (últimos 3 envios).`,
                     client: client
                  });
             }
         }
 
-        // 2. Anomalia de Frequência (Quebra de Padrão Individual)
-        // Se o cliente tem histórico, calculamos seu "Intervalo Médio" entre compras
+        // 2. Anomalia de Frequência (Quebra de Padrão)
         if (sortedHistory.length > 5) {
             const firstDate = parseISO(sortedHistory[0].date);
             const lastDate = parseISO(sortedHistory[sortedHistory.length - 1].date);
             const daysSpan = differenceInDays(lastDate, firstDate);
             const avgInterval = Math.max(1, daysSpan / (sortedHistory.length - 1));
             
-            // Se a recência atual for > 3x o intervalo normal dele (e maior que 3 dias absolutos)
-            // Ex: Compra a cada 2 dias, está há 7 dias sem comprar -> Alerta
-            if (client.recency > 3 && client.recency > (avgInterval * 3)) {
+            // Tolerância: 3x o intervalo normal ou mínimo de 10 dias para Curva A
+            const threshold = Math.max(10, avgInterval * 3);
+
+            if (client.recency > threshold) {
                 alerts.push({
                     id: `alert-${client.id}-freq`,
                     clientId: client.id,
@@ -323,19 +347,7 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
                     type: 'frequency_drop',
                     severity: 'medium',
                     metric: `${client.recency}d`,
-                    message: `Quebra de recorrência (cliente usualmente envia a cada ${avgInterval.toFixed(0)}d).`,
-                    client: client
-                 });
-            } else if (client.recency > 10) {
-                 // Fallback: Clientes Curva A parados há mais de 10 dias sempre merecem atenção
-                 alerts.push({
-                    id: `alert-${client.id}-flow`,
-                    clientId: client.id,
-                    clientName: client.name,
-                    type: 'anomaly',
-                    severity: 'medium',
-                    metric: `${client.recency}d`,
-                    message: `Pausa prolongada no fluxo de envios VIP.`,
+                    message: `Interrupção no fluxo (esperado a cada ~${avgInterval.toFixed(0)}d).`,
                     client: client
                  });
             }
@@ -356,7 +368,7 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       };
   }
 
-  // 1. Sets para lookup O(1)
+  // Sets para lookup rápido
   const filterYearsSet = new Set(filters.years);
   const filterMonthsSet = new Set(filters.months);
   const filterClientsSet = new Set(filters.clients);
@@ -371,12 +383,11 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
   const hasDestFilter = filterDestinationsSet.size > 0;
   const hasSegmentFilter = filterSegmentsSet.size > 0;
 
-  // Determinar Data Referência
+  // Determinar Data Referência Global
   let maxDateStr = "2000-01-01";
   const allOrigins = new Set<string>();
   const allDestinations = new Set<string>();
 
-  // Pré-loop para pegar metadata global (origins/destinations) e MaxDate
   allClients.forEach(c => {
       if (c.lastShipmentDate > maxDateStr) maxDateStr = c.lastShipmentDate;
       c.origin.forEach(o => allOrigins.add(o));
@@ -391,14 +402,12 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
   for (let i = 0; i < allClients.length; i++) {
       const client = allClients[i];
 
-      // Filtro Rápido de Cliente ID
       if (hasClientFilter && !filterClientsSet.has(client.id)) continue;
 
       let filteredRevenue = 0;
       let filteredShipments = 0;
       const currentClientHistory: {date: string, value: number}[] = [];
 
-      // Loop Histórico Otimizado
       const history = client.history;
       for (let j = 0; j < history.length; j++) {
           const t = history[j];
@@ -410,10 +419,10 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
 
           filteredRevenue += t.value;
           filteredShipments++;
-          
           currentClientHistory.push({ date: t.date, value: t.value });
       }
 
+      // Se aplicou filtros temporais e não tem resultado, pula (mas mantém se for só filtro de cliente)
       if (filteredRevenue === 0 && (hasYearFilter || hasMonthFilter)) {
            continue;
       }
@@ -422,10 +431,11 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           globalFilteredHistory.push(currentClientHistory[k]);
       }
 
-      // Cálculos de Segmentação e Score
+      // Métricas Globais (independente do filtro temporal para segmentação correta)
       const daysSinceLastGlobal = differenceInDays(referenceDate, parseISO(client.lastShipmentDate));
       const daysSinceFirstGlobal = differenceInDays(referenceDate, parseISO(client.firstShipmentDate));
       
+      // Score de Saúde
       let score = 50;
       if (daysSinceLastGlobal <= 30) score += 40;
       else if (daysSinceLastGlobal <= 60) score += 20;
@@ -443,7 +453,8 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       else if (score >= 60) health = HealthScore.GOOD;
       else if (score <= 30) health = HealthScore.CRITICAL;
 
-      // Segmentação (CORREÇÃO DE LÓGICA: PRIORIZAR INATIVIDADE)
+      // --- LÓGICA DE SEGMENTAÇÃO CORRIGIDA ---
+      // Prioridade: Inatividade > Tempo de Cadastro
       let segment = Segment.POTENTIAL;
 
       if (daysSinceLastGlobal > 180) {
@@ -451,11 +462,12 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       } else if (daysSinceLastGlobal > 90) {
         segment = Segment.AT_RISK;
       } else {
-        // Se chegou aqui, o cliente está ATIVO (<= 90 dias)
-        // Apenas se estiver ativo verificamos se é Novo ou Recorrente
+        // Cliente está ATIVO (Recência <= 90 dias)
+        // Só agora verificamos se é novo
         if (daysSinceFirstGlobal <= 90) { 
             segment = Segment.NEW;
         } else {
+            // Ativo e antigo
             segment = Segment.LOYAL;
         }
       }
@@ -489,6 +501,7 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
 
   processedClients.sort((a, b) => b.totalRevenue - a.totalRevenue);
   
+  // Cálculo Curva ABC
   const totalRev = processedClients.reduce((acc, c) => acc + c.totalRevenue, 0);
   let accum = 0;
   for(let i=0; i<processedClients.length; i++) {
