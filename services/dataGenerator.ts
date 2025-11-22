@@ -1,5 +1,5 @@
 import { Client, Segment, ABCCategory, HealthScore, FilterState, ProcessResult, OpportunityTag, ChartDataPoint, ClientAlert } from "../types";
-import { parseISO, differenceInDays, format, subMonths, addMonths, isAfter, isBefore, isValid } from 'date-fns';
+import { parseISO, differenceInDays, format, subMonths, addMonths, isAfter, isBefore, isValid, startOfMonth, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // URL da Planilha Pública (Exportação CSV)
@@ -124,9 +124,9 @@ const parseCSVText = (text: string): Client[] => {
         history: [], 
         origin: [],
         destination: [],
-        // Inicializa com datas extremas para serem sobrescritas
-        firstShipmentDate: '2099-12-31', 
-        lastShipmentDate: '2000-01-01'
+        // Inicializa com null para ser preenchido corretamente depois
+        firstShipmentDate: undefined, 
+        lastShipmentDate: undefined
       });
     }
 
@@ -147,10 +147,11 @@ const parseCSVText = (text: string): Client[] => {
             month: month
         });
 
-        if (client.lastShipmentDate && dateIsoString > client.lastShipmentDate) {
+        // Atualização dinâmica de datas extremas
+        if (!client.lastShipmentDate || dateIsoString > client.lastShipmentDate) {
             client.lastShipmentDate = dateIsoString;
         }
-        if (client.firstShipmentDate && dateIsoString < client.firstShipmentDate) {
+        if (!client.firstShipmentDate || dateIsoString < client.firstShipmentDate) {
             client.firstShipmentDate = dateIsoString;
         }
     }
@@ -159,13 +160,16 @@ const parseCSVText = (text: string): Client[] => {
     if (destination && destination !== 'N/A' && !client.destination?.includes(destination)) client.destination?.push(destination);
   }
 
-  // Pós-processamento para garantir integridade
+  // Pós-processamento
   const clients: Client[] = Array.from(clientsMap.values()).map(c => {
       const cl = c as Client;
       
-      // Fallback se não encontrou datas válidas
-      if (cl.firstShipmentDate === '2099-12-31') cl.firstShipmentDate = nowStr;
-      if (cl.lastShipmentDate === '2000-01-01') cl.lastShipmentDate = nowStr;
+      // Fallbacks
+      if (!cl.firstShipmentDate) cl.firstShipmentDate = nowStr;
+      if (!cl.lastShipmentDate) cl.lastShipmentDate = nowStr;
+
+      // Ordenar histórico por data para garantir precisão futura
+      cl.history.sort((a, b) => a.date.localeCompare(b.date));
 
       return {
           ...cl,
@@ -210,34 +214,31 @@ const calculateProjections = (
   const sortedKeys = Array.from(monthlyReal.keys()).sort();
   const maxDate = parseISO(maxDateStr);
   
-  // 2. Definir janela de 12 meses atrás a partir da Data de Referência
-  const twelveMonthsAgo = subMonths(maxDate, 12);
+  // 2. Definir janela estrita: Últimos 12 meses a partir da referência
   const chartPoints: ChartDataPoint[] = [];
 
-  // Filtrar apenas os últimos 12 meses para o gráfico
-  sortedKeys.forEach(key => {
-      const [y, m] = key.split('-').map(Number);
-      const dateObj = new Date(y, m - 1, 1);
+  // Preencher histórico (apenas últimos 12 meses)
+  for (let i = 11; i >= 0; i--) {
+      const d = subMonths(maxDate, i);
+      const key = format(d, 'yyyy-MM');
+      const val = monthlyReal.get(key) || 0;
       
-      if (isAfter(dateObj, twelveMonthsAgo) || key === maxDateStr.substring(0, 7)) {
-          chartPoints.push({
-              name: format(dateObj, 'MMM/yy', { locale: ptBR }),
-              date: key,
-              revenue: monthlyReal.get(key) || 0,
-              projectedRevenue: null,
-              isProjection: false
-          });
-      }
-  });
+      chartPoints.push({
+          name: format(d, 'MMM/yy', { locale: ptBR }),
+          date: key,
+          revenue: val,
+          projectedRevenue: null,
+          isProjection: false
+      });
+  }
 
   // --- LÓGICA DE PROJEÇÃO CONSERVADORA ---
-  // Base: Média ponderada dos últimos 6 meses disponíveis
+  // Base: Média ponderada dos últimos 6 meses
   const historyLen = sortedKeys.length;
   const monthsToConsider = Math.min(6, historyLen);
   let weightedSum = 0;
   let weightTotal = 0;
 
-  // Pegar os ultimos X meses reais (independente se entraram no gráfico ou não)
   for (let i = 0; i < monthsToConsider; i++) {
       const key = sortedKeys[historyLen - 1 - i];
       const val = monthlyReal.get(key) || 0;
@@ -247,12 +248,8 @@ const calculateProjections = (
   }
 
   const weightedAvg = weightTotal > 0 ? weightedSum / weightTotal : 0;
-  const SAFETY_MARGIN = 0.85; // Margem de segurança de 15%
+  const SAFETY_MARGIN = 0.85; // Margem de segurança
   let baseValue = weightedAvg * SAFETY_MARGIN;
-
-  // Data Inicial para Projeção
-  const lastRealKey = sortedKeys[sortedKeys.length - 1];
-  let [py, pm] = lastRealKey ? lastRealKey.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
 
   // Link visual
   if (chartPoints.length > 0) {
@@ -260,12 +257,12 @@ const calculateProjections = (
   }
 
   // Gerar 12 meses futuros
+  let currentDate = maxDate;
   for (let i = 1; i <= 12; i++) {
-      pm++;
-      if (pm > 12) { pm = 1; py++; }
-      const mIndex = pm - 1; 
+      currentDate = addMonths(currentDate, 1);
+      const mIndex = currentDate.getMonth();
       
-      // Sazonalidade Típica (Conservadora)
+      // Sazonalidade
       let seasonFactor = 1.0;
       if (mIndex === 0) seasonFactor = 0.85; // Jan
       else if (mIndex === 1) seasonFactor = 0.88; // Fev
@@ -275,11 +272,10 @@ const calculateProjections = (
       else if (mIndex === 11) seasonFactor = 1.05; // Dez
       
       const val = baseValue * seasonFactor;
-      const pDate = new Date(py, pm - 1, 1);
       
       chartPoints.push({
-          name: format(pDate, 'MMM/yy', { locale: ptBR }),
-          date: `${py}-${String(pm).padStart(2, '0')}`,
+          name: format(currentDate, 'MMM/yy', { locale: ptBR }),
+          date: format(currentDate, 'yyyy-MM'),
           revenue: null,
           projectedRevenue: val,
           isProjection: true
@@ -294,15 +290,15 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
     const alerts: ClientAlert[] = [];
     
     // Filtrar clientes ativos e relevantes
-    const activeRelevant = clients.filter(c => c.recency <= 45 && c.totalRevenue > 0);
+    const activeRelevant = clients.filter(c => c.recency <= 90 && c.totalRevenue > 0);
 
     activeRelevant.forEach(client => {
-        // Alerta de Queda de Ticket (Curva A ou B)
+        // Alerta de Queda de Ticket
         if (client.abcCategory === ABCCategory.A || client.abcCategory === ABCCategory.B) {
             const history = client.history.sort((a,b) => a.date.localeCompare(b.date));
             const last3 = history.slice(-3);
-            if (last3.length === 3) {
-                const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / 3;
+            if (last3.length >= 2) {
+                const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / last3.length;
                 if (recentAvg < (client.averageTicket * 0.7)) {
                     alerts.push({
                         id: `tk-${client.id}`,
@@ -312,17 +308,15 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
                         type: 'ticket_drop',
                         severity: 'high',
                         metric: `-${Math.round((1 - recentAvg/client.averageTicket)*100)}%`,
-                        message: 'Ticket médio caiu drasticamente nos últimos 3 envios.'
+                        message: 'Queda brusca no ticket médio (últimos 3 envios).'
                     });
                 }
             }
         }
         
-        // Alerta de Interrupção de Fluxo (Baseado na frequência média)
+        // Alerta de Frequência
         if (client.frequency > 5) {
-             // Estimativa simples de intervalo médio
              const estimatedInterval = 365 / Math.max(1, client.frequency * (365/Math.max(1, differenceInDays(parseISO(client.lastShipmentDate), parseISO(client.firstShipmentDate)))));
-             // Se recência > 3x o intervalo normal
              if (client.recency > Math.max(15, estimatedInterval * 3)) {
                  alerts.push({
                     id: `fq-${client.id}`,
@@ -332,7 +326,7 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
                     type: 'frequency_drop',
                     severity: 'medium',
                     metric: `${client.recency}d`,
-                    message: `Cliente fora do padrão habitual de envio (~${Math.round(estimatedInterval)}d).`
+                    message: `Cliente fora do padrão de envio (~${Math.round(estimatedInterval)}d).`
                  });
              }
         }
@@ -352,8 +346,6 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       };
   }
 
-  // --- FILTRAGEM EFICIENTE (Memoization manual) ---
-  // Apenas recalcular se necessário. Aqui fazemos direto pois a função é chamada via useMemo no App.tsx
   const hasYearFilter = filters.years.length > 0;
   const hasMonthFilter = filters.months.length > 0;
   const hasClientFilter = filters.clients.length > 0;
@@ -368,7 +360,7 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
   const destSet = new Set(filters.destinations);
   const segmentsSet = new Set(filters.segments);
 
-  // Determinar Data de Referência (A mais recente de TODA a base)
+  // Data de Referência Global (Máxima de toda a base)
   let maxDateStr = "2000-01-01";
   const allOrigins = new Set<string>();
   const allDestinations = new Set<string>();
@@ -384,14 +376,12 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
   const globalFilteredHistory: {date: string, value: number}[] = [];
 
   for (const client of allClients) {
-      // 1. Filtro de Cliente (Rápido)
       if (hasClientFilter && !clientsSet.has(client.id)) continue;
 
       let filteredRevenue = 0;
       let filteredShipments = 0;
       const historyFiltered: typeof client.history = [];
 
-      // 2. Filtros de Transação (Ano, Mês, Rota)
       for (const t of client.history) {
           if (hasYearFilter && !yearsSet.has(t.year)) continue;
           if (hasMonthFilter && !monthsSet.has(t.month)) continue;
@@ -404,42 +394,69 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           globalFilteredHistory.push({ date: t.date, value: t.value });
       }
 
-      // Se aplicou filtros e não sobrou nada, ignora (exceto se for apenas filtro de cliente, onde queremos ver o cadastro)
       if (filteredShipments === 0 && (hasYearFilter || hasMonthFilter || hasOriginFilter || hasDestFilter)) {
           continue;
       }
 
-      // --- CÁLCULO DE SEGMENTAÇÃO (CORRIGIDO) ---
-      // Usamos os dados GLOBAIS do cliente (não filtrados) para definir quem ele é
-      // A segmentação reflete o STATUS ATUAL DO CLIENTE, independente do filtro de mês visualizado
+      // --- SEGMENTAÇÃO CORRIGIDA ---
       const daysSinceLastGlobal = differenceInDays(referenceDate, parseISO(client.lastShipmentDate));
       const daysSinceFirstGlobal = differenceInDays(referenceDate, parseISO(client.firstShipmentDate));
+      const totalGlobalShipments = client.history.length;
 
       let segment = Segment.POTENTIAL;
 
-      // HIERARQUIA DE STATUS (Prioridade para Inatividade)
+      // 1. Inatividade (Prioridade Máxima)
       if (daysSinceLastGlobal > 180) {
-          segment = Segment.LOST; // Inativo > 6 meses
-      } else if (daysSinceLastGlobal > 90) {
-          segment = Segment.AT_RISK; // Inativo > 3 meses (Risco)
-      } else {
-          // Cliente ATIVO (Comprou nos últimos 90 dias)
-          // Só aqui verificamos se é novo
-          if (daysSinceFirstGlobal <= 90) {
-              segment = Segment.NEW; // Começou a comprar agora
+          segment = Segment.LOST;
+      } 
+      else if (daysSinceLastGlobal > 90) {
+          segment = Segment.AT_RISK;
+      }
+      else {
+          // 2. Classificação de Novos vs Recorrentes
+          // Regra Estrita: Novo Cliente APENAS se:
+          // - Cadastro < 90 dias
+          // - POUCOS envios (< 4).
+          // Se tiver muitos envios, mesmo recente, já é Recorrente/Campeão.
+          if (daysSinceFirstGlobal <= 90 && totalGlobalShipments < 4) {
+              segment = Segment.NEW;
           } else {
-              // Ativo e antigo
-              segment = Segment.LOYAL; 
-              // Regra de Campeão (Simplificada)
               const globalRevenue = client.history.reduce((acc, h) => acc + h.value, 0);
-              if (globalRevenue > 100000) segment = Segment.CHAMPIONS;
+              if (globalRevenue > 100000) {
+                  segment = Segment.CHAMPIONS;
+              } else {
+                  segment = Segment.LOYAL;
+              }
           }
       }
 
-      // 3. Filtro de Segmento (Aplica após calcular)
+      // 3. Verificação de "ATENÇÃO IMEDIATA" para corrigir falsos "Novos Clientes"
+      // Se um cliente está marcado como NOVO, mas tem queda de ticket ou anomalia, ele deve ser tratado como Recorrente em Risco/Atenção.
+      if (segment === Segment.NEW) {
+          let isAnomaly = false;
+          
+          // Anomalia 1: Queda de Ticket
+          const historySorted = client.history.sort((a,b) => a.date.localeCompare(b.date));
+          if (historySorted.length >= 2) {
+               const last3 = historySorted.slice(-3);
+               const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / last3.length;
+               const totalAvg = filteredShipments > 0 ? filteredRevenue / filteredShipments : 0;
+               if (recentAvg < (totalAvg * 0.7)) isAnomaly = true;
+          }
+          
+          // Anomalia 2: Tem envios antigos no histórico filtrado que contradizem "Novo"
+          // (Se o arquivo tiver envios antigos, mas daysSinceFirstGlobal calculou errado devido a formato, isso ajuda a capturar)
+          if (totalGlobalShipments > 4) isAnomaly = true;
+
+          if (isAnomaly) {
+              segment = Segment.LOYAL; // Força para Recorrente
+          }
+      }
+
+      // Filtro de Segmento Visual
       if (hasSegmentFilter && !segmentsSet.has(segment)) continue;
 
-      // Score de Saúde
+      // Calcular Score
       let score = 50;
       if (segment === Segment.LOST) score = 10;
       else if (segment === Segment.AT_RISK) score = 30;
@@ -449,12 +466,13 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           if (segment === Segment.CHAMPIONS) score += 15;
           if (segment === Segment.NEW) score += 5;
       }
+
       let health = HealthScore.WARNING;
       if (score >= 80) health = HealthScore.EXCELLENT;
       else if (score >= 60) health = HealthScore.GOOD;
       else if (score <= 30) health = HealthScore.CRITICAL;
 
-      // Tags de Oportunidade
+      // Tags
       let opportunityTag: OpportunityTag = null;
       if (segment === Segment.AT_RISK || segment === Segment.LOST) {
            const globalRev = client.history.reduce((acc, h) => acc + h.value, 0);
@@ -474,14 +492,14 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           frequency: filteredShipments,
           averageTicket: filteredShipments > 0 ? filteredRevenue / filteredShipments : 0,
           segment,
-          abcCategory: ABCCategory.C, // Será recalculado
+          abcCategory: ABCCategory.C,
           healthScore: health,
           healthValue: score,
           opportunityTag
       });
   }
 
-  // Ordenar e Recalcular Curva ABC na lista filtrada
+  // Recalcular ABC na lista filtrada
   processedClients.sort((a, b) => b.totalRevenue - a.totalRevenue);
   const totalRev = processedClients.reduce((acc, c) => acc + c.totalRevenue, 0);
   let accum = 0;

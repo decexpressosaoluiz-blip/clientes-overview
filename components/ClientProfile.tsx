@@ -246,14 +246,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           </div>
         </div>
         <div className="flex items-center gap-3">
-             {/* BOTÃO JUSTIFICAR AGORA SEMPRE DISPONÍVEL SE NÃO HOUVER JUSTIFICATIVA AINDA E ESTIVER INATIVO > 30d */}
-            {!client.justification && client.recency > 30 && (
+             {/* BOTÃO JUSTIFICAR - SEMPRE VISÍVEL SE NÃO HOUVER JUSTIFICATIVA */}
+            {!client.justification && (
                 <button 
                     onClick={() => setShowJustifyForm(true)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer"
                 >
                     <PenTool size={12} />
-                    Justificar
+                    Justificar Inatividade
                 </button>
             )}
              <div className="hidden sm:flex flex-col items-end ml-4 border-l border-sle-neutral-200 dark:border-sle-blue-800 pl-4">
