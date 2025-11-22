@@ -198,9 +198,27 @@ const App: React.FC = () => {
   };
 
   const handleOpenProfile = (client: Client) => {
-    // Ensure we pass the latest version of client with overrides
-    const latestClient = mergedClients.find(c => c.id === client.id) || client;
-    setSelectedClientProfile(latestClient);
+    // Busca o cliente bruto (com histórico completo)
+    const rawClient = mergedClients.find(c => c.id === client.id);
+    
+    if (rawClient) {
+        // Combina o cliente bruto com os dados processados (Segmento correto, Scores, etc)
+        // Isso corrige o bug onde o cliente aparecia como "Novo" pois mergedClients ainda tem o estado inicial
+        const profileClient = {
+            ...rawClient,
+            segment: client.segment,
+            healthScore: client.healthScore,
+            healthValue: client.healthValue,
+            abcCategory: client.abcCategory,
+            recency: client.recency,
+            opportunityTag: client.opportunityTag,
+            // Mantemos firstShipmentDate recalculado se disponível no cliente processado
+            firstShipmentDate: client.firstShipmentDate || rawClient.firstShipmentDate
+        };
+        setSelectedClientProfile(profileClient);
+    } else {
+        setSelectedClientProfile(client);
+    }
   };
 
   if (isLoading) {

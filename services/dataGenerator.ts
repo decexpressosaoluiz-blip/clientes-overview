@@ -76,7 +76,8 @@ const splitCSVLine = (line: string): string[] => {
 // --- FETCH ---
 export const fetchGoogleSheetData = async (): Promise<Client[]> => {
   try {
-    const response = await fetch(GOOGLE_SHEET_CSV_URL);
+    // Adicionado timestamp para evitar cache do navegador/proxy e forçar dados novos
+    const response = await fetch(`${GOOGLE_SHEET_CSV_URL}&t=${Date.now()}`);
     if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
     const csvText = await response.text();
     return parseCSVText(csvText);
@@ -170,6 +171,11 @@ const parseCSVText = (text: string): Client[] => {
 
       // Ordenar histórico por data para garantir precisão futura
       cl.history.sort((a, b) => a.date.localeCompare(b.date));
+
+      // Garante que a data inicial seja realmente a mais antiga do histórico ordenado
+      if (cl.history.length > 0) {
+          cl.firstShipmentDate = cl.history[0].date;
+      }
 
       return {
           ...cl,
@@ -290,11 +296,13 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
     const alerts: ClientAlert[] = [];
     
     // Filtrar clientes ativos e relevantes
+    // EXCLUIR 'NEW' de alertas de queda de ticket para evitar falsos positivos
     const activeRelevant = clients.filter(c => c.recency <= 90 && c.totalRevenue > 0);
 
     activeRelevant.forEach(client => {
-        // Alerta de Queda de Ticket
-        if (client.abcCategory === ABCCategory.A || client.abcCategory === ABCCategory.B) {
+        // Alerta de Queda de Ticket - Apenas para clientes Base (Recorrentes/Campeões)
+        // Clientes novos ainda estão rampando, oscilação é normal.
+        if ((client.abcCategory === ABCCategory.A || client.abcCategory === ABCCategory.B) && client.segment !== Segment.NEW) {
             const history = client.history.sort((a,b) => a.date.localeCompare(b.date));
             const last3 = history.slice(-3);
             if (last3.length >= 2) {
@@ -398,14 +406,28 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           continue;
       }
 
-      // --- SEGMENTAÇÃO CORRIGIDA ---
+      // --- SEGMENTAÇÃO RIGOROSA ---
+      
+      // 1. Recência (Inatividade)
       const daysSinceLastGlobal = differenceInDays(referenceDate, parseISO(client.lastShipmentDate));
-      const daysSinceFirstGlobal = differenceInDays(referenceDate, parseISO(client.firstShipmentDate));
-      const totalGlobalShipments = client.history.length;
+      
+      // 2. Tempo de Casa (Life Time)
+      // REGRA CRÍTICA: Se tem qualquer envio > 90 dias, é BASE (não Novo).
+      // Usamos o histórico completo (sem filtro) para determinar a "Idade do Cliente".
+      // Recalculamos o minDate percorrendo o array para garantir que não haja erro no campo firstShipmentDate
+      let absoluteFirstDate = client.firstShipmentDate;
+      if (client.history.length > 0) {
+          // Pequena otimização: assumimos que está ordenado do parse, mas garantimos pegando o menor valor
+          const minDateFromHist = client.history.reduce((min, cur) => cur.date < min ? cur.date : min, client.history[0].date);
+          if (minDateFromHist < absoluteFirstDate) absoluteFirstDate = minDateFromHist;
+      }
+
+      const firstShipment = parseISO(absoluteFirstDate);
+      const daysSinceFirst = differenceInDays(referenceDate, firstShipment);
 
       let segment = Segment.POTENTIAL;
 
-      // 1. Inatividade (Prioridade Máxima)
+      // Hierarquia de Decisão
       if (daysSinceLastGlobal > 180) {
           segment = Segment.LOST;
       } 
@@ -413,44 +435,26 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           segment = Segment.AT_RISK;
       }
       else {
-          // 2. Classificação de Novos vs Recorrentes
-          // Regra Estrita: Novo Cliente APENAS se:
-          // - Cadastro < 90 dias
-          // - POUCOS envios (< 4).
-          // Se tiver muitos envios, mesmo recente, já é Recorrente/Campeão.
-          if (daysSinceFirstGlobal <= 90 && totalGlobalShipments < 4) {
-              segment = Segment.NEW;
-          } else {
+          // Cliente Ativo (Recência <= 90)
+          
+          if (daysSinceFirst > 90) {
+              // TEMPO DE CASA > 90 DIAS = BASE (Recorrente ou Campeão)
               const globalRevenue = client.history.reduce((acc, h) => acc + h.value, 0);
               if (globalRevenue > 100000) {
                   segment = Segment.CHAMPIONS;
               } else {
                   segment = Segment.LOYAL;
               }
+          } else {
+              // TEMPO DE CASA <= 90 DIAS = NOVO
+              segment = Segment.NEW;
           }
       }
-
-      // 3. Verificação de "ATENÇÃO IMEDIATA" para corrigir falsos "Novos Clientes"
-      // Se um cliente está marcado como NOVO, mas tem queda de ticket ou anomalia, ele deve ser tratado como Recorrente em Risco/Atenção.
-      if (segment === Segment.NEW) {
-          let isAnomaly = false;
-          
-          // Anomalia 1: Queda de Ticket
-          const historySorted = client.history.sort((a,b) => a.date.localeCompare(b.date));
-          if (historySorted.length >= 2) {
-               const last3 = historySorted.slice(-3);
-               const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / last3.length;
-               const totalAvg = filteredShipments > 0 ? filteredRevenue / filteredShipments : 0;
-               if (recentAvg < (totalAvg * 0.7)) isAnomaly = true;
-          }
-          
-          // Anomalia 2: Tem envios antigos no histórico filtrado que contradizem "Novo"
-          // (Se o arquivo tiver envios antigos, mas daysSinceFirstGlobal calculou errado devido a formato, isso ajuda a capturar)
-          if (totalGlobalShipments > 4) isAnomaly = true;
-
-          if (isAnomaly) {
-              segment = Segment.LOYAL; // Força para Recorrente
-          }
+      
+      // TRAVA DE SEGURANÇA:
+      // Se por algum motivo caiu em NEW mas tem dias > 90, força LOYAL
+      if (segment === Segment.NEW && daysSinceFirst > 90) {
+          segment = Segment.LOYAL;
       }
 
       // Filtro de Segmento Visual
@@ -485,6 +489,8 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
 
       processedClients.push({
           ...client,
+          // Atualiza firstShipmentDate caso tenhamos encontrado um mais antigo no processo (sanity check)
+          firstShipmentDate: absoluteFirstDate, 
           totalRevenue: filteredRevenue,
           totalShipments: filteredShipments,
           recency: daysSinceLastGlobal,
