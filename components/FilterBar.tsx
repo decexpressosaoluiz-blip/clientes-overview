@@ -142,7 +142,6 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
     onFilterChange({ ...filters, segments: newSegments });
   };
 
-  // Helper para grupos de status
   const toggleStatusGroup = (group: 'active' | 'risk' | 'inactive') => {
     let targetSegments: Segment[] = [];
     if (group === 'active') {
@@ -153,15 +152,12 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
         targetSegments = [Segment.LOST];
     }
 
-    // Verificar se TODOS do grupo estão selecionados
     const allSelected = targetSegments.every(s => filters.segments.includes(s));
 
     let newSegments = [...filters.segments];
     if (allSelected) {
-        // Desmarcar todos
         newSegments = newSegments.filter(s => !targetSegments.includes(s));
     } else {
-        // Marcar todos (adicionar os que faltam)
         targetSegments.forEach(s => {
             if (!newSegments.includes(s)) newSegments.push(s);
         });
@@ -170,14 +166,14 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
   };
 
   return (
-    <div className="bg-white/70 backdrop-blur-lg rounded-3xl shadow-soft border border-white/50 p-6 mb-8 relative z-50 flex flex-col gap-6 transition-all duration-300 hover:shadow-elevated select-none">
+    <div className="bg-white/70 backdrop-blur-lg rounded-3xl shadow-soft border border-white/50 p-4 sm:p-6 mb-8 relative z-50 flex flex-col gap-6 transition-all duration-300 hover:shadow-elevated select-none">
       
       {/* --- TOP SECTION: Search & Dropdowns --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         
         {/* Busca de Cliente */}
-        <div className="lg:col-span-4 relative z-20 flex flex-col">
-            <div className={`relative group transition-all duration-200 ${isSearchFocused ? 'scale-[1.02]' : ''}`}>
+        <div className="w-full lg:w-1/3 relative z-20 flex flex-col">
+            <div className={`relative group transition-all duration-200 ${isSearchFocused ? 'scale-[1.01]' : ''}`}>
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     {isSearching ? (
                         <Loader2 size={18} className="text-indigo-500 animate-spin" />
@@ -203,6 +199,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                 )}
             </div>
 
+            {/* Selected Client Tags */}
             {filters.clients.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3 animate-in slide-in-from-top-2 duration-200">
                     {filters.clients.map(id => {
@@ -229,6 +226,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                 </div>
             )}
 
+            {/* Search Dropdown */}
             {isSearchFocused && clientSearch.length >= 2 && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-sle-neutral-100 overflow-hidden z-[1000] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 p-2">
                         {clientSuggestions.length > 0 ? (
@@ -252,7 +250,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                                             {isSelected ? <Check size={20} strokeWidth={3} /> : <Building2 size={18} strokeWidth={2} />}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-bold truncate transition-colors ${isSelected ? 'text-emerald-800' : 'text-sle-neutral-700 group-hover:text-indigo-800'}`}>
+                                            <p className="text-sm font-bold truncate transition-colors text-sle-neutral-700 group-hover:text-indigo-800">
                                                 {client.name}
                                             </p>
                                             <div className="flex items-center gap-1.5 mt-0.5">
@@ -276,7 +274,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
         </div>
 
         {/* Dropdowns Container */}
-        <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="w-full lg:w-2/3 grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Origem */}
             <div className="relative">
                 <button 
@@ -432,20 +430,20 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
       </div>
 
       {/* --- MIDDLE SECTION: Time Filters --- */}
-      <div className="bg-sle-neutral-50/60 rounded-2xl p-5 border border-sle-neutral-100">
+      <div className="bg-sle-neutral-50/60 rounded-2xl p-4 sm:p-5 border border-sle-neutral-100">
           <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
               {/* Years */}
-              <div className="flex-shrink-0">
+              <div className="w-full lg:w-auto flex-shrink-0">
                   <div className="flex items-center gap-2 mb-3 text-sle-neutral-400">
                       <CalendarRange size={14} strokeWidth={2.5} />
                       <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Ano de Referência</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-row lg:flex-wrap gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
                      {years.map(year => (
                          <button 
                             key={year} 
                             onClick={() => toggleYear(year)} 
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer border ${
+                            className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer border whitespace-nowrap ${
                                 filters.years.includes(year) 
                                 ? 'bg-sle-red-500 text-white border-sle-red-500 shadow-sle-red-200/50' 
                                 : 'bg-white text-sle-neutral-500 border-sle-neutral-200 hover:border-sle-red-200 hover:text-sle-red-500 hover:shadow-md'
@@ -460,7 +458,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
               <div className="hidden lg:block w-px bg-sle-neutral-200 self-stretch mx-2"></div>
 
               {/* Months */}
-              <div className="flex-1">
+              <div className="w-full lg:flex-1">
                   <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2 text-sle-neutral-400">
                           <CalendarDays size={14} strokeWidth={2.5} />
@@ -473,12 +471,13 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                         {filters.months.length === 12 ? 'Desmarcar Todos' : 'Ano Completo'}
                       </button>
                   </div>
-                  <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
+                  {/* Scroll horizontal em mobile, grid em desktop */}
+                  <div className="flex overflow-x-auto pb-2 lg:pb-0 gap-2 lg:grid lg:grid-cols-12 lg:gap-2 scrollbar-hide">
                     {months.map(m => (
                         <button 
                             key={m.num} 
                             onClick={() => toggleMonth(m.num)} 
-                            className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center active:scale-95 cursor-pointer border ${
+                            className={`flex-shrink-0 w-16 lg:w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center active:scale-95 cursor-pointer border ${
                                 filters.months.includes(m.num) 
                                 ? 'bg-indigo-500 text-white border-indigo-500 shadow-indigo-200/50' 
                                 : 'bg-white text-sle-neutral-500 border-sle-neutral-200 hover:border-indigo-200 hover:text-indigo-500 hover:shadow-md'
@@ -496,11 +495,12 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
       {(filters.origins.length > 0 || filters.destinations.length > 0 || filters.segments.length > 0) && (
           <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300 pt-2 border-t border-sle-neutral-100">
                {[...filters.origins.map(o => ({t:'origin', v:o, i:MapPin})), ...filters.destinations.map(d => ({t:'dest', v:d, i:Navigation})), ...filters.segments.map(s => ({t:'seg', v:s, i:Users}))].map((item, idx) => (
-                   <span key={idx} className="inline-flex items-center pl-3 pr-1 py-1 bg-white border border-sle-neutral-200 rounded-full text-[11px] font-bold text-sle-neutral-700 shadow-sm">
-                      <item.i size={12} className="mr-1.5 text-sle-neutral-400" strokeWidth={2}/> {item.v}
+                   <span key={idx} className="inline-flex items-center pl-3 pr-1 py-1 bg-white border border-sle-neutral-200 rounded-full text-[11px] font-bold text-sle-neutral-700 shadow-sm max-w-full">
+                      <item.i size={12} className="mr-1.5 text-sle-neutral-400 shrink-0" strokeWidth={2}/> 
+                      <span className="truncate max-w-[150px]">{item.v}</span>
                       <button 
                         onClick={() => item.t === 'seg' ? toggleSegment(item.v as Segment) : toggleFilterItem(item.t as any, item.v as string)} 
-                        className="ml-2 p-1 hover:bg-rose-50 rounded-full transition-colors text-sle-neutral-400 hover:text-rose-500 cursor-pointer"
+                        className="ml-2 p-1 hover:bg-rose-50 rounded-full transition-colors text-sle-neutral-400 hover:text-rose-500 cursor-pointer shrink-0"
                       >
                          <X size={12} strokeWidth={3} />
                       </button>

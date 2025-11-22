@@ -206,24 +206,24 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
   return (
     <div className="flex flex-col h-full bg-[#F8F9FC] dark:bg-sle-blue-950 animate-in slide-in-from-right duration-300 font-sans relative">
       
-      {/* Header Compacto */}
-      <div className="bg-white/80 dark:bg-sle-blue-900/80 backdrop-blur-xl border-b border-sle-neutral-200 dark:border-sle-blue-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-        <div className="flex items-center gap-4">
+      {/* Header Responsivo */}
+      <div className="bg-white/80 dark:bg-sle-blue-900/80 backdrop-blur-xl border-b border-sle-neutral-200 dark:border-sle-blue-800 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between sticky top-0 z-30 shadow-sm gap-4">
+        <div className="flex items-start gap-4">
           <button 
             onClick={onBack}
-            className="p-2 -ml-2 rounded-full hover:bg-sle-neutral-100 dark:hover:bg-sle-blue-800 text-sle-neutral-400 dark:text-sle-blue-300 hover:text-sle-neutral-700 dark:hover:text-white transition-all group active:scale-90 cursor-pointer"
+            className="p-2 -ml-2 rounded-full hover:bg-sle-neutral-100 dark:hover:bg-sle-blue-800 text-sle-neutral-400 dark:text-sle-blue-300 hover:text-sle-neutral-700 dark:hover:text-white transition-all group active:scale-90 cursor-pointer mt-1 sm:mt-0"
           >
             <ArrowLeft size={20} strokeWidth={2.5} className="group-hover:-translate-x-1 transition-transform" />
           </button>
-          <div>
-            <h2 className="text-lg font-bold text-sle-neutral-900 dark:text-white flex items-center gap-2">
-              {client.name}
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-sle-neutral-900 dark:text-white flex flex-wrap items-center gap-2 leading-snug">
+              <span className="truncate max-w-[200px] sm:max-w-[400px]">{client.name}</span>
               {client.justification ? (
-                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1">
+                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1 shrink-0">
                     <Ban size={10} /> {client.justification.reason}
                  </span>
               ) : (
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider ${
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider shrink-0 ${
                     client.segment === Segment.LOST ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' :
                     client.segment === Segment.AT_RISK ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
                     client.segment === Segment.NEW ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
@@ -233,10 +233,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                 </span>
               )}
             </h2>
-            <div className="flex items-center gap-4 text-xs text-sle-neutral-500 dark:text-sle-blue-300 mt-0.5 font-medium">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-sle-neutral-500 dark:text-sle-blue-300 mt-1 font-medium">
                <span className="font-mono">{client.cnpj}</span>
-               <span className="w-1 h-1 rounded-full bg-sle-neutral-300 dark:bg-sle-blue-600"></span>
-               <span className="flex items-center gap-1" title="Rota mais frequente">
+               <span className="hidden sm:inline w-1 h-1 rounded-full bg-sle-neutral-300 dark:bg-sle-blue-600"></span>
+               <span className="flex items-center gap-1 truncate" title="Rota mais frequente">
                  <MapPin size={10} />
                  {topOrigin} 
                  <span className="text-sle-neutral-300 dark:text-sle-blue-600">→</span> 
@@ -245,21 +245,22 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-             {/* BOTÃO JUSTIFICAR - SEMPRE VISÍVEL SE NÃO HOUVER JUSTIFICATIVA */}
-            {!client.justification && (
+        
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-10 sm:pl-0">
+             {!client.justification && (
                 <button 
                     onClick={() => setShowJustifyForm(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer whitespace-nowrap"
                 >
                     <PenTool size={12} />
-                    Justificar Inatividade
+                    <span className="hidden sm:inline">Justificar</span>
+                    <span className="sm:hidden">Justificar</span>
                 </button>
             )}
-             <div className="hidden sm:flex flex-col items-end ml-4 border-l border-sle-neutral-200 dark:border-sle-blue-800 pl-4">
-                <span className="text-[10px] text-sle-neutral-400 dark:text-sle-blue-400 font-bold uppercase tracking-widest mb-1">Score de Saúde</span>
+             <div className="flex flex-col items-end sm:ml-4 sm:border-l sm:border-sle-neutral-200 sm:dark:border-sle-blue-800 sm:pl-4">
+                <span className="text-[10px] text-sle-neutral-400 dark:text-sle-blue-400 font-bold uppercase tracking-widest mb-1">Score</span>
                 <div className="flex items-center gap-2">
-                    <div className="relative w-24 h-1.5 bg-sle-neutral-100 dark:bg-sle-blue-800 rounded-full overflow-hidden">
+                    <div className="relative w-16 sm:w-24 h-1.5 bg-sle-neutral-100 dark:bg-sle-blue-800 rounded-full overflow-hidden">
                         <div 
                             className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
                                 client.healthValue >= 80 ? 'bg-emerald-500' : 
@@ -278,44 +279,44 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center px-6 border-b border-sle-neutral-100 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 sticky top-[72px] z-20 gap-6">
+      <div className="flex items-center px-4 sm:px-6 border-b border-sle-neutral-100 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 sticky top-[90px] sm:top-[72px] z-20 gap-6 overflow-x-auto scrollbar-hide">
           <button 
             onClick={() => setActiveTab('overview')}
-            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors cursor-pointer ${activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
+            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
           >
             Visão Geral
           </button>
           <button 
             onClick={() => setActiveTab('actions')}
-            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${activeTab === 'actions' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
+            className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'actions' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
           >
             Diário de Bordo
             <span className="bg-sle-neutral-100 dark:bg-sle-blue-800 text-sle-neutral-500 dark:text-sle-blue-200 px-1.5 rounded text-[9px]">{(client.actions?.length || 0)}</span>
           </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6">
         
         {/* CONTEÚDO DA ABA VISÃO GERAL */}
         {activeTab === 'overview' && (
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
             
-            {/* KPI Cards - Estilo Minimalista */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI Cards - Grid adaptativo */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {[
                     { label: 'Faturamento Total', value: client.totalRevenue, icon: DollarSign, color: 'blue', format: true },
                     { label: 'Total Envios', value: client.totalShipments, icon: Package, color: 'indigo', format: false },
                     { label: 'Ticket Médio', value: client.averageTicket, icon: TrendingUp, color: 'emerald', format: true },
                     { label: 'Recência', value: `${client.recency} dias`, icon: Clock, color: 'amber', format: false }
                 ].map((kpi, i) => (
-                    <div key={i} className="bg-white dark:bg-sle-blue-900 p-5 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card hover:shadow-md transition-all hover:-translate-y-0.5 cursor-default select-none">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className={`p-2.5 rounded-xl bg-${kpi.color}-50 dark:bg-${kpi.color}-900/20 text-${kpi.color}-600 dark:text-${kpi.color}-400`}>
-                                <kpi.icon size={18} strokeWidth={2} />
+                    <div key={i} className="bg-white dark:bg-sle-blue-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card hover:shadow-md transition-all cursor-default select-none">
+                        <div className="flex items-center gap-3 mb-2 sm:mb-3">
+                            <div className={`p-2 rounded-xl bg-${kpi.color}-50 dark:bg-${kpi.color}-900/20 text-${kpi.color}-600 dark:text-${kpi.color}-400`}>
+                                <kpi.icon size={16} strokeWidth={2} />
                             </div>
-                            <span className="text-[10px] font-bold text-sle-neutral-400 dark:text-sle-blue-300 uppercase tracking-wider">{kpi.label}</span>
+                            <span className="text-[10px] font-bold text-sle-neutral-400 dark:text-sle-blue-300 uppercase tracking-wider truncate">{kpi.label}</span>
                         </div>
-                        <div className="text-xl font-extrabold text-sle-neutral-900 dark:text-white tracking-tight">
+                        <div className="text-lg sm:text-xl font-extrabold text-sle-neutral-900 dark:text-white tracking-tight truncate">
                             {kpi.format && typeof kpi.value === 'number'
                                 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(kpi.value) 
                                 : kpi.value}
@@ -327,19 +328,19 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* SEÇÃO 1: GRÁFICO DE HISTÓRICO */}
-                <div className="lg:col-span-2 bg-white dark:bg-sle-blue-900 p-8 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card flex flex-col h-[480px] hover:shadow-soft dark:hover:shadow-dark-soft transition-all">
-                    <div className="flex justify-between items-start mb-6">
+                <div className="lg:col-span-2 bg-white dark:bg-sle-blue-900 p-4 sm:p-8 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card flex flex-col h-[350px] sm:h-[480px] hover:shadow-soft dark:hover:shadow-dark-soft transition-all">
+                    <div className="flex justify-between items-start mb-4 sm:mb-6">
                         <div>
-                            <h3 className="text-lg font-bold text-sle-neutral-900 dark:text-white">Performance Financeira</h3>
-                            <p className="text-sm text-sle-neutral-400 dark:text-sle-blue-300 font-medium mt-1">Evolução de receita (Últimos 12 meses)</p>
+                            <h3 className="text-base sm:text-lg font-bold text-sle-neutral-900 dark:text-white">Performance Financeira</h3>
+                            <p className="text-xs sm:text-sm text-sle-neutral-400 dark:text-sle-blue-300 font-medium mt-1">Evolução de receita (Últimos 12 meses)</p>
                         </div>
-                        <div className={`flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${
+                        <div className={`flex items-center px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold ${
                             trend.direction === 'up' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 
                             trend.direction === 'down' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400' : 'bg-sle-neutral-50 dark:bg-sle-blue-800 text-sle-neutral-600 dark:text-sle-blue-300'
                         }`}>
-                            {trend.direction === 'up' ? <ArrowUpRight size={14} className="mr-1" strokeWidth={2.5}/> : 
-                             trend.direction === 'down' ? <ArrowDownRight size={14} className="mr-1" strokeWidth={2.5}/> : null}
-                            {trend.value}% vs. mês anterior
+                            {trend.direction === 'up' ? <ArrowUpRight size={12} className="mr-1" strokeWidth={2.5}/> : 
+                             trend.direction === 'down' ? <ArrowDownRight size={12} className="mr-1" strokeWidth={2.5}/> : null}
+                            {trend.value}%
                         </div>
                     </div>
                     
@@ -359,6 +360,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                                     tickLine={false} 
                                     tick={{fill: chartTextColor, fontSize: 10, fontWeight: 600}} 
                                     dy={10}
+                                    interval="preserveStartEnd"
                                 />
                                 <YAxis 
                                     axisLine={false} 
@@ -479,42 +481,42 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             {/* Tabela de Análise de Rotas e Cadastro */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white dark:bg-sle-blue-900 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card overflow-hidden hover:shadow-soft dark:hover:shadow-dark-soft transition-all">
-                    <div className="px-8 py-6 border-b border-sle-neutral-50 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 flex justify-between items-center">
+                    <div className="px-6 sm:px-8 py-5 sm:py-6 border-b border-sle-neutral-50 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 flex justify-between items-center">
                         <div>
-                            <h3 className="font-bold text-sle-neutral-900 dark:text-white flex items-center gap-2">
+                            <h3 className="font-bold text-sle-neutral-900 dark:text-white flex items-center gap-2 text-sm sm:text-base">
                                 <Route size={18} className="text-indigo-500" />
                                 Principais Rotas
                             </h3>
-                            <p className="text-xs text-sle-neutral-500 dark:text-sle-blue-300 mt-1">Análise de origem e destino por maior volume financeiro</p>
+                            <p className="text-[10px] sm:text-xs text-sle-neutral-500 dark:text-sle-blue-300 mt-1">Análise de origem e destino por maior volume financeiro</p>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="bg-sle-neutral-50/50 dark:bg-sle-blue-950/30 text-sle-neutral-400 dark:text-sle-blue-400 text-xs uppercase tracking-wider font-bold">
-                                    <th className="px-8 py-4">Rota</th>
-                                    <th className="px-8 py-4 text-center">Qtd. Envios</th>
-                                    <th className="px-8 py-4 text-right">Volume Financeiro</th>
+                                    <th className="px-4 sm:px-8 py-3 sm:py-4">Rota</th>
+                                    <th className="px-4 sm:px-8 py-3 sm:py-4 text-center">Qtd.</th>
+                                    <th className="px-4 sm:px-8 py-3 sm:py-4 text-right">Volume</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-sle-neutral-50 dark:divide-sle-blue-800">
                                 {topRoutes.map((route, idx) => (
                                     <tr key={idx} className="hover:bg-sle-neutral-50 dark:hover:bg-sle-blue-800 transition-colors group">
-                                        <td className="px-8 py-4 text-sle-neutral-600 dark:text-sle-blue-300">
+                                        <td className="px-4 sm:px-8 py-3 sm:py-4 text-sle-neutral-600 dark:text-sle-blue-300">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] sm:text-xs font-bold shrink-0">
                                                     {idx + 1}
                                                 </div>
-                                                <span className="font-bold text-sle-neutral-800 dark:text-white">{route.origin}</span>
+                                                <span className="font-bold text-sle-neutral-800 dark:text-white text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{route.origin}</span>
                                                 <span className="text-sle-neutral-300 dark:text-sle-blue-600">→</span>
-                                                <span className="font-bold text-sle-neutral-800 dark:text-white">{route.dest}</span>
+                                                <span className="font-bold text-sle-neutral-800 dark:text-white text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{route.dest}</span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-4 text-center text-sle-neutral-600 dark:text-sle-blue-300 font-medium">
+                                        <td className="px-4 sm:px-8 py-3 sm:py-4 text-center text-sle-neutral-600 dark:text-sle-blue-300 font-medium text-xs sm:text-sm">
                                             {route.count}
                                         </td>
-                                        <td className="px-8 py-4 text-right font-bold text-sle-neutral-900 dark:text-white tabular-nums">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(route.value)}
+                                        <td className="px-4 sm:px-8 py-3 sm:py-4 text-right font-bold text-sle-neutral-900 dark:text-white tabular-nums text-xs sm:text-sm">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(route.value)}
                                         </td>
                                     </tr>
                                 ))}
@@ -529,7 +531,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                 </div>
 
                 {/* Cadastro Card Compacto */}
-                <div className="lg:col-span-1 bg-white dark:bg-sle-blue-900 p-6 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card h-full hover:shadow-soft dark:hover:shadow-dark-soft transition-all">
+                <div className="lg:col-span-1 bg-white dark:bg-sle-blue-900 p-5 sm:p-6 rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card h-full hover:shadow-soft dark:hover:shadow-dark-soft transition-all">
                     <div className="flex justify-between items-center mb-5">
                         <h4 className="font-bold text-sle-neutral-900 dark:text-white text-sm">Ficha Cadastral</h4>
                         <button className="text-sle-neutral-400 dark:text-sle-blue-400 hover:text-sle-blue-600 dark:hover:text-white transition-colors cursor-pointer p-1 rounded-full hover:bg-sle-neutral-50 dark:hover:bg-sle-blue-800"><MoreHorizontal size={18}/></button>
@@ -579,14 +581,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             <div className="max-w-4xl mx-auto">
                  <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h3 className="text-lg font-bold text-sle-neutral-900 dark:text-white">Histórico de Ações</h3>
-                        <p className="text-sm text-sle-neutral-500 dark:text-sle-blue-300">Registro de contatos e ações para clientes em Atenção Imediata.</p>
+                        <h3 className="text-base sm:text-lg font-bold text-sle-neutral-900 dark:text-white">Histórico de Ações</h3>
+                        <p className="text-xs sm:text-sm text-sle-neutral-500 dark:text-sle-blue-300">Registro de contatos e ações para clientes em Atenção Imediata.</p>
                     </div>
                     <button 
                         onClick={() => setShowActionForm(true)}
                         className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all active:scale-95"
                     >
-                        <Plus size={16} /> Nova Ação
+                        <Plus size={16} /> <span className="hidden sm:inline">Nova Ação</span>
                     </button>
                  </div>
 
@@ -598,11 +600,11 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                          </div>
                      ) : (
                          (client.actions || []).map((action) => (
-                             <div key={action.id} className="bg-white dark:bg-sle-blue-900 p-5 rounded-2xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm flex gap-4 hover:shadow-md transition-all">
-                                 <div className="flex flex-col items-center text-sle-neutral-400 dark:text-sle-blue-400 w-16 flex-shrink-0 border-r border-sle-neutral-100 dark:border-sle-blue-800 pr-4">
-                                     <span className="text-xl font-bold text-sle-neutral-800 dark:text-white">{format(parseISO(action.date), 'dd')}</span>
+                             <div key={action.id} className="bg-white dark:bg-sle-blue-900 p-4 sm:p-5 rounded-2xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm flex flex-col sm:flex-row gap-4 hover:shadow-md transition-all">
+                                 <div className="flex sm:flex-col items-center sm:justify-center text-sle-neutral-400 dark:text-sle-blue-400 w-full sm:w-16 flex-shrink-0 sm:border-r border-b sm:border-b-0 border-sle-neutral-100 dark:border-sle-blue-800 pb-2 sm:pb-0 sm:pr-4 gap-2 sm:gap-0">
+                                     <span className="text-base sm:text-xl font-bold text-sle-neutral-800 dark:text-white">{format(parseISO(action.date), 'dd')}</span>
                                      <span className="text-xs font-bold uppercase">{format(parseISO(action.date), 'MMM')}</span>
-                                     <span className="text-[10px] mt-1 text-sle-neutral-300 dark:text-sle-blue-600">{format(parseISO(action.date), 'yyyy')}</span>
+                                     <span className="text-[10px] mt-0 sm:mt-1 text-sle-neutral-300 dark:text-sle-blue-600">{format(parseISO(action.date), 'yyyy')}</span>
                                  </div>
                                  <div className="flex-1">
                                      <div className="flex justify-between items-start mb-1">
@@ -623,10 +625,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
 
       </div>
 
-      {/* Modal Justificar */}
+      {/* Modal Justificar - Mobile Friendly */}
       {showJustifyForm && (
-          <div className="absolute inset-0 z-50 bg-sle-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-sle-blue-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="absolute inset-0 z-50 bg-sle-neutral-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+              <div className="bg-white dark:bg-sle-blue-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200">
                   <div className="px-6 py-4 border-b border-sle-neutral-100 dark:border-sle-blue-800 flex justify-between items-center bg-slate-50 dark:bg-sle-blue-950">
                       <h3 className="font-bold text-sle-neutral-900 dark:text-white">Justificar Inatividade</h3>
                       <button onClick={() => setShowJustifyForm(false)} className="text-sle-neutral-400 dark:text-sle-blue-400 hover:text-rose-500"><X size={20}/></button>
@@ -675,10 +677,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           </div>
       )}
 
-      {/* Modal Nova Ação */}
+      {/* Modal Nova Ação - Mobile Friendly */}
       {showActionForm && (
-          <div className="absolute inset-0 z-50 bg-sle-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-sle-blue-900 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="absolute inset-0 z-50 bg-sle-neutral-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+              <div className="bg-white dark:bg-sle-blue-900 w-full max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200">
                   <div className="px-6 py-4 border-b border-sle-neutral-100 dark:border-sle-blue-800 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/30">
                       <h3 className="font-bold text-indigo-900 dark:text-indigo-200">Registrar Ação</h3>
                       <button onClick={() => setShowActionForm(false)} className="text-indigo-400 hover:text-indigo-700 dark:hover:text-white"><X size={20}/></button>

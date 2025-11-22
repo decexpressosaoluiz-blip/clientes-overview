@@ -12,12 +12,8 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
   const [showJustified, setShowJustified] = useState(false);
 
   const { activeOpportunities, justifiedOpportunities } = useMemo(() => {
-    // Filtra clientes que estão inativos há mais de 90 dias
     const allOpp = clients.filter(c => c.recency > 90);
-    
     const justified = allOpp.filter(c => !!c.justification);
-    
-    // Clientes ativos na lista são aqueles SEM justificativa
     const active = allOpp.filter(c => !c.justification).sort((a, b) => {
           const getTagWeight = (tag: string | undefined | null) => {
               if (tag === 'Frete Premium') return 4;
@@ -30,7 +26,6 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
           if (weightA !== weightB) return weightB - weightA;
           return b.averageTicket - a.averageTicket;
       });
-
       return { activeOpportunities: active, justifiedOpportunities: justified };
   }, [clients]);
 
@@ -71,7 +66,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
   };
 
   return (
-    <div className="bg-white p-8 rounded-[2rem] shadow-soft border border-sle-neutral-100 h-full flex flex-col select-none transition-all hover:shadow-elevated relative overflow-hidden">
+    <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-soft border border-sle-neutral-100 h-full flex flex-col select-none transition-all hover:shadow-elevated relative overflow-hidden group">
       
       {/* Header */}
       <div className="flex items-start justify-between mb-4 z-10 relative">
@@ -80,7 +75,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
               <div className={`p-2 rounded-xl transition-colors ${showJustified ? 'bg-sle-neutral-100 text-sle-neutral-500' : 'bg-amber-50 text-amber-500'}`}>
                 {showJustified ? <Ban size={20} strokeWidth={2.5} /> : <Sparkles size={20} strokeWidth={2.5} fill="currentColor" fillOpacity={0.2} />}
               </div>
-              {showJustified ? 'Clientes Justificados' : 'Reativação Inteligente'}
+              <span className="truncate">{showJustified ? 'Justificados' : 'Reativação'}</span>
             </h3>
         </div>
         <div className="flex gap-2">
@@ -104,7 +99,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
       
       {showJustified && (
           <div className="mb-4 px-4 py-2 bg-sle-neutral-50 rounded-lg text-[10px] text-sle-neutral-500 text-center border border-sle-neutral-100">
-              Exibindo clientes removidos da lista principal.
+              Exibindo clientes removidos.
           </div>
       )}
 
@@ -119,11 +114,11 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
                 <button
                     key={client.id} 
                     onClick={() => onOpenProfile(client)}
-                    className={`w-full flex items-center justify-between p-3 rounded-2xl bg-white border border-transparent hover:shadow-lg transition-all duration-300 group cursor-pointer active:scale-[0.98] text-left z-10 gap-4 ${showJustified ? 'opacity-75 hover:opacity-100' : 'hover:border-indigo-100 hover:bg-indigo-50/30'}`}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl bg-white border border-transparent hover:shadow-lg transition-all duration-300 group cursor-pointer active:scale-[0.98] text-left z-10 gap-3 sm:gap-4 ${showJustified ? 'opacity-75 hover:opacity-100' : 'hover:border-indigo-100 hover:bg-indigo-50/30'}`}
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                       <div className={`
-                        w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0 transition-transform group-hover:scale-110
+                        w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0 transition-transform group-hover:scale-110
                         ${showJustified 
                             ? 'bg-sle-neutral-100 text-sle-neutral-400'
                             : (index === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white ring-4 ring-white' : 'bg-white border border-sle-neutral-200 text-sle-neutral-500 group-hover:border-indigo-200 group-hover:text-indigo-600')
@@ -133,7 +128,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-sle-neutral-800 truncate group-hover:text-indigo-700 transition-colors">
+                        <p className="text-xs sm:text-sm font-bold text-sle-neutral-800 truncate group-hover:text-indigo-700 transition-colors">
                             {client.name}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
