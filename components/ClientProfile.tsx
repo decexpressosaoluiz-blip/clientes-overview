@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Client, HealthScore, Segment } from '../types';
+import { Client, HealthScore, Segment, ClientJustification, ClientAction } from '../types';
 import { 
   ArrowLeft, Phone, Mail, TrendingUp, Package, DollarSign, 
   BrainCircuit, AlertTriangle, Clock, Loader2, MoreHorizontal, 
@@ -13,9 +13,11 @@ import { generateClientInsights, InsightResult } from '../services/geminiService
 interface ClientProfileProps {
   client: Client;
   onBack: () => void;
+  onJustify?: (clientId: string, justification: ClientJustification) => void;
+  onLogAction?: (clientId: string, action: ClientAction) => void;
 }
 
-export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack }) => {
+export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, onJustify, onLogAction }) => {
   const [aiSuggestions, setAiSuggestions] = useState<InsightResult[]>([]);
   const [loadingAI, setLoadingAI] = useState(false);
 

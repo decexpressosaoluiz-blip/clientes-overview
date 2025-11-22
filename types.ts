@@ -1,5 +1,3 @@
-
-
 export enum Segment {
   CHAMPIONS = 'Cliente Fiel',      // Antigo Champions/Loyal
   LOYAL = 'Recorrente',               // Antigo Loyal
@@ -41,6 +39,21 @@ export interface Transaction {
   month: number;
 }
 
+export interface ClientJustification {
+  reason: string;
+  note: string;
+  date: string;
+  user?: string;
+}
+
+export interface ClientAction {
+  id: string;
+  type: 'call' | 'email' | 'meeting' | 'whatsapp' | 'note';
+  description: string;
+  date: string;
+  user?: string;
+}
+
 export interface Client {
   id: string;
   name: string; // Coluna F
@@ -69,6 +82,10 @@ export interface Client {
   healthScore: HealthScore;
   healthValue: number; // 0-100
   opportunityTag?: OpportunityTag;
+
+  // Override Fields
+  justification?: ClientJustification;
+  actions?: ClientAction[];
 }
 
 export interface ClientData {

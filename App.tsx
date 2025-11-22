@@ -5,7 +5,7 @@ import {
   Calendar, BrainCircuit
 } from 'lucide-react';
 import { generateMockData, processClients, generateClientAlerts } from './services/dataGenerator';
-import { Client, FilterState, ABCCategory, ClientAlert } from './types';
+import { Client, FilterState, ABCCategory, ClientAlert, ClientAction, ClientJustification } from './types';
 import { KPICard } from './components/KPICard';
 import { FilterBar } from './components/FilterBar';
 import { DrillDownTable } from './components/DrillDownTable';
@@ -16,10 +16,35 @@ import { PortfolioAnalysisModal } from './components/PortfolioAnalysisModal';
 import { AlertBanner } from './components/AlertBanner';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell, Area, ComposedChart, Line, BarChart, Bar } from 'recharts';
 
+// Estado local para "persistência" durante a sessão
+type ClientOverrides = Record<string, { justification?: ClientJustification, actions: ClientAction[] }>;
+
+const STORAGE_KEY = 'sle_dashboard_data_v1';
+
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingText, setLoadingText] = useState('Carregando Dashboard...');
   const [allClients, setAllClients] = useState<Client[]>([]);
+  
+  // "Banco de Dados" local de edições do usuário com persistência no LocalStorage
+  const [clientOverrides, setClientOverrides] = useState<ClientOverrides>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Erro ao carregar dados locais", e);
+      return {};
+    }
+  });
+
+  // Salvar no LocalStorage sempre que houver mudança
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clientOverrides));
+    } catch (e) {
+      console.error("Erro ao salvar dados locais", e);
+    }
+  }, [clientOverrides]);
   
   const [isPortfolioAnalysisOpen, setIsPortfolioAnalysisOpen] = useState(false);
   
@@ -60,9 +85,20 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
+  // Merge raw data with local overrides (Justifications/Actions)
+  const mergedClients = useMemo(() => {
+    return allClients.map(c => ({
+        ...c,
+        justification: clientOverrides[c.id]?.justification,
+        actions: clientOverrides[c.id]?.actions || []
+    }));
+  }, [allClients, clientOverrides]);
+
   const processedData = useMemo(() => {
-      return processClients(allClients, filters);
-  }, [allClients, filters]);
+      // We pass mergedClients instead of allClients to ensure overrides are respected in processing if needed
+      // though current processing logic doesn't depend on logs, it might depend on active status later.
+      return processClients(mergedClients, filters);
+  }, [mergedClients, filters]);
 
   const { 
       clients: filteredClients, 
@@ -71,6 +107,10 @@ const App: React.FC = () => {
       availableOrigins, 
       availableDestinations 
   } = processedData;
+
+  // Filter out justified clients from the main list if needed, 
+  // but usually we want them in charts, just not in "Reactivation" lists.
+  // ReactivationOpportunities component will handle the filtering.
 
   useEffect(() => {
       if (filteredClients.length > 0) {
@@ -89,6 +129,28 @@ const App: React.FC = () => {
       setDismissedAlertIds(newSet);
   };
 
+  // Handlers for Client Profile modifications
+  const handleJustifyClient = (clientId: string, justification: ClientJustification) => {
+     setClientOverrides(prev => ({
+         ...prev,
+         [clientId]: {
+             ...prev[clientId],
+             justification
+         }
+     }));
+  };
+
+  const handleLogAction = (clientId: string, action: ClientAction) => {
+    setClientOverrides(prev => ({
+        ...prev,
+        [clientId]: {
+            ...prev[clientId],
+            actions: [action, ...(prev[clientId]?.actions || [])]
+        }
+    }));
+  };
+
+  // Stats Calculation
   const stats = useMemo(() => {
     const totalRevenue = filteredClients.reduce((acc, c) => acc + c.totalRevenue, 0);
     const totalShipments = filteredClients.reduce((acc, c) => acc + c.totalShipments, 0);
@@ -136,7 +198,9 @@ const App: React.FC = () => {
   };
 
   const handleOpenProfile = (client: Client) => {
-    setSelectedClientProfile(client);
+    // Ensure we pass the latest version of client with overrides
+    const latestClient = mergedClients.find(c => c.id === client.id) || client;
+    setSelectedClientProfile(latestClient);
   };
 
   if (isLoading) {
@@ -440,7 +504,12 @@ const App: React.FC = () => {
                         onClick={() => setSelectedClientProfile(null)}
                     ></div>
                     <div className="relative bg-white w-full max-w-6xl h-full sm:h-[90vh] flex flex-col overflow-hidden sm:rounded-[2rem] shadow-2xl border border-white/20">
-                        <ClientProfile client={selectedClientProfile} onBack={() => setSelectedClientProfile(null)} />
+                        <ClientProfile 
+                            client={selectedClientProfile} 
+                            onBack={() => setSelectedClientProfile(null)}
+                            onJustify={handleJustifyClient}
+                            onLogAction={handleLogAction}
+                        />
                     </div>
                  </div>
             )}
