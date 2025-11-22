@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard de Clientes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+              display: ['"Plus Jakarta Sans"', 'sans-serif'],
+            },
+            colors: {
+              sle: {
+                // Paleta Vermelha (Baseada em #EC1B23)
+                red: {
+                  900: '#7D0E13',
+                  800: '#991117',
+                  700: '#B4151B',
+                  600: '#D0181F',
+                  500: '#EC1B23', // Primary Red
+                  400: '#F4797E',
+                  300: '#F8A8AB',
+                  100: '#FCD7D9',
+                  50: '#FEF2F2'
+                },
+                // Paleta Azul (Baseada em #24268B e #2E31B4)
+                blue: {
+                  950: '#080921', // Darkest BG
+                  900: '#13144A', // Dark Card BG
+                  800: '#1A1B62',
+                  700: '#24268B',
+                  600: '#2E31B4',
+                  500: '#4649CF', // Primary Blue
+                  400: '#6E71DA',
+                  300: '#9798E4',
+                  200: '#BFC0EF', // Text Muted Dark
+                  100: '#E8E8F9',
+                  50: '#F8FAFC' // Light BG
+                },
+                // Neutros da Paleta (Tons de Cinza Azulado - Moderno)
+                neutral: {
+                  900: '#0F172A', // Text Main Light
+                  800: '#1E293B',
+                  700: '#334155',
+                  600: '#475569', // Text Muted Light
+                  500: '#64748B',
+                  400: '#94A3B8',
+                  300: '#CBD5E1',
+                  200: '#E2E8F0', // Borders
+                  100: '#F1F5F9',
+                  50: '#FFFFFF'
+                }
+              }
+            },
+            boxShadow: {
+              'soft': '0 10px 40px -10px rgba(0,0,0,0.05)',
+              'card': '0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.05)',
+              'elevated': '0 20px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)',
+              'glow': '0 0 20px rgba(236, 27, 35, 0.15)',
+              'inner-light': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.02)',
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+              'slide-up': 'slideUp 0.4s ease-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(10px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --sle-red: 355 83% 52%;
+        --sle-blue: 221 73% 50%;
+      }
+      
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #F8FAFC;
+        color: #0F172A;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Modern Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #CBD5E1; 
+        border-radius: 4px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #94A3B8; 
+      }
+
+      ::selection {
+        background-color: #E0E7FF; /* Indigo 100 */
+        color: #3730A3; /* Indigo 800 */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "clsx": "https://aistudiocdn.com/clsx@^2.1.0",
+    "date-fns": "https://aistudiocdn.com/date-fns@^3.3.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^11.0.3",
+    "date-fns/": "https://aistudiocdn.com/date-fns@^4.1.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
