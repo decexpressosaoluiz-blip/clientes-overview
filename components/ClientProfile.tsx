@@ -215,9 +215,9 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           >
             <ArrowLeft size={20} strokeWidth={2.5} className="group-hover:-translate-x-1 transition-transform" />
           </button>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-bold text-sle-neutral-900 dark:text-white flex flex-wrap items-center gap-2 leading-snug">
-              <span className="truncate max-w-[200px] sm:max-w-[400px]">{client.name}</span>
+              <span className="truncate block sm:inline max-w-[200px] sm:max-w-[400px]">{client.name}</span>
               {client.justification ? (
                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border tracking-wider bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1 shrink-0">
                     <Ban size={10} /> {client.justification.reason}
@@ -236,7 +236,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-sle-neutral-500 dark:text-sle-blue-300 mt-1 font-medium">
                <span className="font-mono">{client.cnpj}</span>
                <span className="hidden sm:inline w-1 h-1 rounded-full bg-sle-neutral-300 dark:bg-sle-blue-600"></span>
-               <span className="flex items-center gap-1 truncate" title="Rota mais frequente">
+               <span className="flex items-center gap-1 truncate max-w-[200px] sm:max-w-none" title="Rota mais frequente">
                  <MapPin size={10} />
                  {topOrigin} 
                  <span className="text-sle-neutral-300 dark:text-sle-blue-600">→</span> 
@@ -246,15 +246,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
           </div>
         </div>
         
-        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-10 sm:pl-0">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-10 sm:pl-0 border-t sm:border-t-0 border-sle-neutral-100 pt-3 sm:pt-0">
              {!client.justification && (
                 <button 
                     onClick={() => setShowJustifyForm(true)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wide transition-colors cursor-pointer whitespace-nowrap"
                 >
                     <PenTool size={12} />
-                    <span className="hidden sm:inline">Justificar</span>
-                    <span className="sm:hidden">Justificar</span>
+                    <span className="inline">Justificar</span>
                 </button>
             )}
              <div className="flex flex-col items-end sm:ml-4 sm:border-l sm:border-sle-neutral-200 sm:dark:border-sle-blue-800 sm:pl-4">
@@ -279,7 +278,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center px-4 sm:px-6 border-b border-sle-neutral-100 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 sticky top-[90px] sm:top-[72px] z-20 gap-6 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center px-4 sm:px-6 border-b border-sle-neutral-100 dark:border-sle-blue-800 bg-white dark:bg-sle-blue-900 sticky top-[130px] sm:top-[72px] z-20 gap-6 overflow-x-auto scrollbar-hide">
           <button 
             onClick={() => setActiveTab('overview')}
             className={`py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-sle-neutral-400 hover:text-sle-neutral-600 dark:text-sle-blue-400 dark:hover:text-white'}`}
@@ -302,7 +301,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
             
             {/* KPI Cards - Grid adaptativo */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {[
                     { label: 'Faturamento Total', value: client.totalRevenue, icon: DollarSign, color: 'blue', format: true },
                     { label: 'Total Envios', value: client.totalShipments, icon: Package, color: 'indigo', format: false },
@@ -344,7 +343,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
                         </div>
                     </div>
                     
-                    <div className="flex-1 w-full min-h-0">
+                    <div className="flex-1 w-full min-w-0">
                          <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                 <defs>

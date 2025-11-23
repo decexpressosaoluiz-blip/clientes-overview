@@ -96,7 +96,6 @@ const App: React.FC = () => {
 
   const processedData = useMemo(() => {
       // We pass mergedClients instead of allClients to ensure overrides are respected in processing if needed
-      // though current processing logic doesn't depend on logs, it might depend on active status later.
       return processClients(mergedClients, filters);
   }, [mergedClients, filters]);
 
@@ -235,7 +234,7 @@ const App: React.FC = () => {
   const chartTooltipBorder = '#E2E8F0';
 
   return (
-    <div className="min-h-screen bg-sle-blue-50 font-sans text-sle-neutral-600 pb-20 selection:bg-indigo-100 selection:text-indigo-700">
+    <div className="min-h-screen bg-sle-blue-50 font-sans text-sle-neutral-600 pb-20 selection:bg-indigo-100 selection:text-indigo-700 overflow-x-hidden">
         
         {/* HEADER */}
         <header className="bg-white/80 backdrop-blur-md border-b border-sle-neutral-200 sticky top-0 z-40 shadow-sm transition-all">
@@ -299,7 +298,7 @@ const App: React.FC = () => {
             </div>
 
             {/* KPI GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <KPICard 
                   title="Faturamento" 
                   value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(stats.revenue)} 
@@ -355,7 +354,7 @@ const App: React.FC = () => {
                     </div>
                 </div>
                 {/* Altura responsiva para o gráfico */}
-                <div className="h-[280px] sm:h-[320px] lg:h-[380px] w-full">
+                <div className="h-[280px] sm:h-[320px] lg:h-[380px] w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{top: 10, right: 10, left: -10, bottom: 0}}>
                             <defs>
@@ -437,7 +436,7 @@ const App: React.FC = () => {
                             </button>
                          ))}
                     </div>
-                    <div className="h-32 mt-6">
+                    <div className="h-32 mt-6 w-full min-w-0">
                         <ResponsiveContainer width="100%" height="100%">
                              <BarChart data={abcData} margin={{top: 10, right: 0, left: 0, bottom: 0}}>
                                 <XAxis dataKey="name" hide />
@@ -473,7 +472,7 @@ const App: React.FC = () => {
                     </button>
                 </div>
                 {/* Altura ajustada para mobile (scroll vertical implícito se necessário, mas aqui é fixo) */}
-                <div className="h-[400px] sm:h-[500px] w-full">
+                <div className="h-[400px] sm:h-[500px] w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart 
                           layout="vertical" 

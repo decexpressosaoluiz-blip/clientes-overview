@@ -86,7 +86,8 @@ export const ClientSegmentation: React.FC<ClientSegmentationProps> = ({ clients,
                 <div className="text-left flex-1 min-w-0">
                     <div className="text-xs sm:text-sm font-bold text-sle-neutral-900 group-hover:text-rose-900 transition-colors truncate">Inativos</div>
                     <div className="text-[10px] sm:text-xs text-sle-neutral-500 font-medium flex items-center gap-2 truncate">
-                        Inativo 180+ dias
+                        <span className="hidden sm:inline">Inativo 180+ dias</span>
+                        <span className="sm:hidden">180+ dias</span>
                         {premiumLostCount > 0 && (
                             <span className="px-1.5 py-0.5 bg-white border border-rose-100 text-rose-600 rounded text-[9px] font-extrabold uppercase shadow-sm">
                                 {premiumLostCount} VIPs
