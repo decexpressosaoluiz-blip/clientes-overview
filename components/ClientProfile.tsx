@@ -64,7 +64,29 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       return () => { isMounted = false; };
   }, [client.id]);
 
-  // Processar dados para o gráfico com contagem e ticket médio
+  // Robust Stats Calculation (Fallback to history if passed zeroes)
+  const computedStats = useMemo(() => {
+      // If we have passed stats, use them
+      if (client.totalRevenue > 0) {
+          return {
+              revenue: client.totalRevenue,
+              shipments: client.totalShipments,
+              ticket: client.averageTicket,
+              recency: client.recency
+          };
+      }
+      // Otherwise calculate from full history (avoids showing 0 in Profile)
+      const rev = client.history.reduce((acc, h) => acc + h.value, 0);
+      const ships = client.history.length;
+      return {
+          revenue: rev,
+          shipments: ships,
+          ticket: ships > 0 ? rev / ships : 0,
+          recency: client.recency 
+      };
+  }, [client]);
+
+  // Process data for chart
   const chartData = useMemo(() => {
     const historyMap = new Map<string, { value: number, count: number }>();
     if (client.history.length > 0) {
@@ -85,11 +107,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Exibir apenas últimos 12 meses
     return data.slice(-12);
   }, [client]);
 
-  // Cálculo de Tendência
+  // Trend Calc
   const trend = useMemo(() => {
       if (chartData.length < 2) return { value: 0, direction: 'neutral' };
       const last = chartData[chartData.length - 1].value;
@@ -102,7 +123,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
       };
   }, [chartData]);
 
-  // Análise de Rotas
+  // Route Analysis
   const { topOrigin, topDestination, topRoutes } = useMemo(() => {
     const originCounts: Record<string, number> = {};
     const destCounts: Record<string, number> = {};
@@ -303,10 +324,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client, onBack, on
             {/* KPI Cards - Grid adaptativo */}
             <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {[
-                    { label: 'Faturamento Total', value: client.totalRevenue, icon: DollarSign, color: 'blue', format: true },
-                    { label: 'Total Envios', value: client.totalShipments, icon: Package, color: 'indigo', format: false },
-                    { label: 'Ticket Médio', value: client.averageTicket, icon: TrendingUp, color: 'emerald', format: true },
-                    { label: 'Recência', value: `${client.recency} dias`, icon: Clock, color: 'amber', format: false }
+                    { label: 'Faturamento Total', value: computedStats.revenue, icon: DollarSign, color: 'blue', format: true },
+                    { label: 'Total Envios', value: computedStats.shipments, icon: Package, color: 'indigo', format: false },
+                    { label: 'Ticket Médio', value: computedStats.ticket, icon: TrendingUp, color: 'emerald', format: true },
+                    { label: 'Recência', value: `${computedStats.recency} dias`, icon: Clock, color: 'amber', format: false }
                 ].map((kpi, i) => (
                     <div key={i} className="bg-white dark:bg-sle-blue-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-sle-neutral-100 dark:border-sle-blue-800 shadow-sm dark:shadow-dark-card hover:shadow-md transition-all cursor-default select-none">
                         <div className="flex items-center gap-3 mb-2 sm:mb-3">
