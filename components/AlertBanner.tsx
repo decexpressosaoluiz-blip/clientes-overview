@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, X, ArrowRight, Zap, TrendingDown, Clock } from 'lucide-react';
+import { AlertTriangle, X, ArrowRight, Zap, TrendingDown, Clock, DollarSign, Package } from 'lucide-react';
 import { ClientAlert, Client } from '../types';
 
 interface AlertBannerProps {
@@ -51,7 +51,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onV
                 <div 
                     key={alert.id}
                     onClick={() => onViewClient(alert.client)}
-                    className={`relative p-4 rounded-2xl border transition-all cursor-pointer group active:scale-[0.98] hover:shadow-md bg-white border-sle-neutral-200 hover:border-rose-300`}
+                    className={`relative p-4 rounded-2xl border transition-all cursor-pointer group active:scale-[0.98] hover:shadow-md bg-white border-sle-neutral-200 hover:border-rose-300 flex flex-col justify-between`}
                 >
                     <div className="flex justify-between items-start mb-2">
                         <div className={`p-1.5 rounded-lg ${s.bg} ${s.iconColor}`}>
@@ -62,8 +62,28 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onV
                         </span>
                     </div>
                     
-                    <h4 className="font-bold text-sm text-sle-neutral-900 truncate mb-1">{alert.clientName}</h4>
-                    <p className="text-xs text-sle-neutral-500 leading-relaxed line-clamp-2">{alert.message}</p>
+                    <div className="mb-3">
+                        <h4 className="font-bold text-sm text-sle-neutral-900 truncate mb-1 pr-6" title={alert.clientName}>{alert.clientName}</h4>
+                        <p className="text-xs text-sle-neutral-500 leading-relaxed line-clamp-2 min-h-[2.5em]">{alert.message}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-sle-neutral-50 flex items-center justify-between mt-auto">
+                         <div className="flex items-center gap-3">
+                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-sle-neutral-600" title={`Receita Total: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(alert.client.totalRevenue)}`}>
+                                <div className="p-0.5 bg-emerald-50 rounded-md text-emerald-600">
+                                    <DollarSign size={10} strokeWidth={3} />
+                                </div>
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(alert.client.totalRevenue)}
+                             </div>
+                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-sle-neutral-600" title={`Envios Totais: ${alert.client.totalShipments}`}>
+                                <div className="p-0.5 bg-indigo-50 rounded-md text-indigo-600">
+                                    <Package size={10} strokeWidth={3} />
+                                </div>
+                                {alert.client.totalShipments}
+                             </div>
+                         </div>
+                         <ArrowRight size={14} className="text-rose-400 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" strokeWidth={2.5} />
+                    </div>
 
                     <button 
                         onClick={(e) => { e.stopPropagation(); onDismiss(alert.id); }}
@@ -71,10 +91,6 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onV
                     >
                         <X size={14} strokeWidth={2.5} />
                     </button>
-
-                    <div className="mt-3 flex items-center text-[10px] font-bold text-sle-neutral-400 uppercase tracking-widest group-hover:text-rose-600 transition-colors">
-                        Ver Análise <ArrowRight size={12} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
                 </div>
             );
           })}
