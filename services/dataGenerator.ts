@@ -414,12 +414,12 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       // 2. Tempo de Casa (Life Time)
       // REGRA CRÍTICA: Se tem qualquer envio > 90 dias, é BASE (não Novo).
       // Usamos o histórico completo (sem filtro) para determinar a "Idade do Cliente".
-      // Recalculamos o minDate percorrendo o array para garantir que não haja erro no campo firstShipmentDate
+      
+      // Verificação de Segurança da Data Inicial: percorre todo histórico para achar a data mais antiga real
       let absoluteFirstDate = client.firstShipmentDate;
       if (client.history.length > 0) {
-          // Pequena otimização: assumimos que está ordenado do parse, mas garantimos pegando o menor valor
-          const minDateFromHist = client.history.reduce((min, cur) => cur.date < min ? cur.date : min, client.history[0].date);
-          if (minDateFromHist < absoluteFirstDate) absoluteFirstDate = minDateFromHist;
+           const dates = client.history.map(h => h.date).sort();
+           if (dates[0] < absoluteFirstDate) absoluteFirstDate = dates[0];
       }
 
       const firstShipment = parseISO(absoluteFirstDate);
@@ -451,7 +451,7 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
           }
       }
       
-      // TRAVA DE SEGURANÇA:
+      // TRAVA DE SEGURANÇA FINAL:
       // Se por algum motivo caiu em NEW mas tem dias > 90, força LOYAL
       if (segment === Segment.NEW && daysSinceFirst > 90) {
           segment = Segment.LOYAL;

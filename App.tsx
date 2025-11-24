@@ -193,17 +193,32 @@ const App: React.FC = () => {
   };
 
   const handleOpenProfile = (client: Client) => {
+    // Busca o cliente "cru" para ter acesso ao histórico completo (sem filtros de data)
     const rawClient = mergedClients.find(c => c.id === client.id);
     
     if (rawClient) {
+        // CORREÇÃO CRÍTICA: Mesclamos os dados brutos (histórico completo) 
+        // com os dados calculados (receita, envios, ticket do filtro atual).
+        // Isso impede que apareça R$ 0 nos cards.
         const profileClient = {
             ...rawClient,
+            
+            // Substitui os zeros do rawClient pelos valores calculados (do cliente clicado)
+            totalRevenue: client.totalRevenue,
+            totalShipments: client.totalShipments,
+            averageTicket: client.averageTicket,
+            monetary: client.monetary,
+            frequency: client.frequency,
+            recency: client.recency,
+            
+            // Mantém as segmentações calculadas
             segment: client.segment,
             healthScore: client.healthScore,
             healthValue: client.healthValue,
             abcCategory: client.abcCategory,
-            recency: client.recency,
             opportunityTag: client.opportunityTag,
+            
+            // Garante a melhor data inicial encontrada
             firstShipmentDate: client.firstShipmentDate || rawClient.firstShipmentDate
         };
         setSelectedClientProfile(profileClient);
