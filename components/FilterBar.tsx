@@ -26,17 +26,17 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
   const [originSearch, setOriginSearch] = useState('');
   const [destSearch, setDestSearch] = useState('');
 
-  // Debounce effect for search
+  // Debounce effect for search with loading state management
   useEffect(() => {
     if (clientSearch !== debouncedSearch) {
         setIsSearching(true);
         const handler = setTimeout(() => {
             setDebouncedSearch(clientSearch);
             setIsSearching(false);
-        }, 300);
+        }, 400); // 400ms debounce
         return () => clearTimeout(handler);
     }
-  }, [clientSearch]);
+  }, [clientSearch, debouncedSearch]);
 
   const years = [2021, 2022, 2023, 2024, 2025];
   const months = [
@@ -100,8 +100,13 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
     } else {
         onFilterChange({ ...filters, clients: [...filters.clients, clientId] });
     }
-    setClientSearch('');
-    setIsSearchFocused(false);
+    // Keep focus and search text to allow multiple selections easily
+    // setClientSearch(''); 
+    // setIsSearchFocused(false);
+  };
+
+  const removeClient = (clientId: string) => {
+      onFilterChange({ ...filters, clients: filters.clients.filter(id => id !== clientId) });
   };
 
   const toggleFilterItem = (type: 'origin' | 'dest', value: string) => {
@@ -183,13 +188,24 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                 </div>
                 <input
                     type="text"
-                    className="block w-full h-12 pl-11 pr-4 bg-white border border-sle-neutral-200 hover:border-sle-neutral-300 focus:border-indigo-500 rounded-2xl text-sle-neutral-800 placeholder:text-sle-neutral-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-semibold text-sm shadow-sm"
+                    className="block w-full h-12 pl-11 pr-10 bg-white border border-sle-neutral-200 hover:border-sle-neutral-300 focus:border-indigo-500 rounded-2xl text-sle-neutral-800 placeholder:text-sle-neutral-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-semibold text-sm shadow-sm"
                     placeholder="Buscar Cliente (Nome ou CNPJ)..."
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                 />
+                
+                {/* Clear Input Button */}
+                {clientSearch && (
+                    <button
+                        onClick={() => { setClientSearch(''); setDebouncedSearch(''); }}
+                        className="absolute inset-y-0 right-2 flex items-center px-2 text-sle-neutral-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    >
+                        <X size={16} />
+                    </button>
+                )}
+
                 {filters.clients.length > 0 && !clientSearch && (
                     <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
                         <span className="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-1 rounded-full">
@@ -199,34 +215,37 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                 )}
             </div>
 
-            {/* Selected Client Tags */}
+            {/* Selected Client Tags Area */}
             {filters.clients.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="flex flex-wrap gap-2 mt-3 animate-in slide-in-from-top-2 duration-200 p-2 bg-sle-neutral-50/50 rounded-xl border border-sle-neutral-100/50">
+                    <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-[10px] font-bold text-sle-neutral-400 uppercase tracking-wide ml-1">Selecionados ({filters.clients.length})</span>
+                        <button 
+                            onClick={() => onFilterChange({ ...filters, clients: [] })}
+                            className="text-[10px] font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2 py-0.5 rounded-md transition-colors"
+                        >
+                            Limpar Todos
+                        </button>
+                    </div>
                     {filters.clients.map(id => {
                         const client = clients.find(c => c.id === id);
                         if (!client) return null;
                         return (
-                            <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm group">
+                            <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white text-indigo-700 border border-indigo-100 shadow-sm group hover:border-indigo-300 transition-all">
                                 <span className="truncate max-w-[120px]">{client.name}</span>
                                 <button
-                                    onClick={() => onFilterChange({ ...filters, clients: filters.clients.filter(x => x !== id) })}
-                                    className="ml-2 p-0.5 hover:bg-indigo-200 rounded-full text-indigo-400 hover:text-indigo-800 transition-colors cursor-pointer"
+                                    onClick={() => removeClient(id)}
+                                    className="ml-2 p-0.5 hover:bg-rose-50 rounded-full text-indigo-300 hover:text-rose-500 transition-colors cursor-pointer"
                                 >
                                     <X size={12} strokeWidth={3} />
                                 </button>
                             </span>
                         );
                     })}
-                    <button 
-                        onClick={() => onFilterChange({ ...filters, clients: [] })}
-                        className="px-3 py-1 text-[10px] font-bold text-sle-neutral-400 hover:text-rose-500 transition-colors"
-                    >
-                        Limpar
-                    </button>
                 </div>
             )}
 
-            {/* Search Dropdown */}
+            {/* Search Dropdown Results */}
             {isSearchFocused && clientSearch.length >= 2 && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-sle-neutral-100 overflow-hidden z-[1000] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 p-2">
                         {clientSuggestions.length > 0 ? (
@@ -260,6 +279,7 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
                                                 </p>
                                             </div>
                                         </div>
+                                        {isSelected && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded ml-2">ADD</span>}
                                     </button>
                                 );
                             })

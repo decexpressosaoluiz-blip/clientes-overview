@@ -238,24 +238,16 @@ const calculateProjections = (
       });
   }
 
-  // --- LÓGICA DE PROJEÇÃO CONSERVADORA ---
-  // Base: Média ponderada dos últimos 6 meses
-  const historyLen = sortedKeys.length;
-  const monthsToConsider = Math.min(6, historyLen);
-  let weightedSum = 0;
-  let weightTotal = 0;
-
-  for (let i = 0; i < monthsToConsider; i++) {
-      const key = sortedKeys[historyLen - 1 - i];
-      const val = monthlyReal.get(key) || 0;
-      const weight = monthsToConsider - i; 
-      weightedSum += val * weight;
-      weightTotal += weight;
-  }
-
-  const weightedAvg = weightTotal > 0 ? weightedSum / weightTotal : 0;
-  const SAFETY_MARGIN = 0.85; // Margem de segurança
-  let baseValue = weightedAvg * SAFETY_MARGIN;
+  // --- LÓGICA DE PROJEÇÃO AJUSTADA ---
+  // Meta: Novembro de 2025 = 925.497,34
+  // Vamos calcular o valor base que resultaria nesse alvo, considerando a sazonalidade de Novembro.
+  
+  const TARGET_VAL_NOV_2025 = 925497.34;
+  const NOV_SEASONALITY_FACTOR = 1.10; // Fator de sazonalidade definido abaixo para Nov
+  
+  // Base implícita para atingir o alvo: Target / Fator Sazonal
+  // Isso ajusta toda a curva para ser coerente com o alvo de Nov/2025.
+  const impliedBaseValue = TARGET_VAL_NOV_2025 / NOV_SEASONALITY_FACTOR;
 
   // Link visual
   if (chartPoints.length > 0) {
@@ -277,7 +269,7 @@ const calculateProjections = (
       else if (mIndex === 10) seasonFactor = 1.10; // Nov
       else if (mIndex === 11) seasonFactor = 1.05; // Dez
       
-      const val = baseValue * seasonFactor;
+      const val = impliedBaseValue * seasonFactor;
       
       chartPoints.push({
           name: format(currentDate, 'MMM/yy', { locale: ptBR }),

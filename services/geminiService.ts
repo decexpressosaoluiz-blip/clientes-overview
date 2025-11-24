@@ -9,7 +9,8 @@ export const analyzeClientFile = async (fileContent: string, fileName: string): 
     console.warn("API Key not found. AI features will be disabled.");
     return [];
   }
-  const model = "gemini-2.5-flash";
+  // Uso do modelo Lite para respostas rápidas e baixo custo em tarefas simples de extração
+  const model = "gemini-2.5-flash-lite";
 
   const prompt = `
     Você é um analista de dados sênior especializado em Customer Success.
@@ -86,41 +87,44 @@ export interface InsightResult {
 export const generateClientInsights = async (client: Client): Promise<InsightResult[]> => {
   if (!process.env.API_KEY) return [{ category: 'attention', title: 'API Key Missing', description: 'Configure a chave de API no Vercel.' }];
   
-  const model = "gemini-2.5-flash";
+  // Uso do modelo PRO com Thinking Mode para insights profundos e não genéricos
+  const model = "gemini-3-pro-preview";
 
   const historySummary = client.history.slice(-5).map(h =>
     `${h.date}: R$${h.value} (${h.origin} -> ${h.destination})`
   ).join('\n');
 
   const prompt = `
-    Você é um estrategista sênior de Customer Success.
-    Analise os dados deste cliente B2B e gere 3 insights ou ações estratégicas.
-    
+    Você é um estrategista sênior de Customer Success focado em logística e transporte B2B.
+    Analise os dados deste cliente especificamente para evitar respostas genéricas como "Mantenha contato".
+    Quero ações táticas, baseadas nos números apresentados.
+
     Dados do Cliente:
     - Nome: ${client.name}
-    - Segmento: ${client.segment}
+    - Segmento Atual: ${client.segment}
+    - Curva ABC: ${client.abcCategory}
     - Saúde: ${client.healthScore} (${client.healthValue}/100)
-    - Receita Total: R$ ${client.totalRevenue}
+    - Receita Total (Período): R$ ${client.totalRevenue}
     - Recência: ${client.recency} dias sem comprar
+    - Frequência: ${client.totalShipments} envios
     - Ticket Médio: R$ ${client.averageTicket}
     
-    Histórico recente:
+    Histórico recente de transações:
     ${historySummary}
 
     Gere EXATAMENTE 3 sugestões estruturadas JSON.
     
-    Categorias permitidas e seus significados:
-    - 'opportunity': Use para "Expansão de Conta" ou "Oferta Complementar" (PROIBIDO usar Upsell/Cross-sell).
-    - 'risk': Para risco de perda de cliente ou queda drástica de volume.
-    - 'attention': Pontos de atenção operacionais ou mudanças de comportamento.
-    - 'retention': Ações de fidelização e relacionamento.
+    Categorias permitidas:
+    - 'opportunity': Para aumento de share-of-wallet ou rotas complementares.
+    - 'risk': Se houver queda de frequência ou ticket.
+    - 'attention': Mudanças operacionais (ex: troca de origem/destino frequente).
+    - 'retention': Ações de blindagem para Curva A.
 
-    Regras de Texto:
-    1. Use linguagem simples, comercial e direta (Português BR).
-    2. PROIBIDO usar termos técnicos em inglês como "Churn", "Upsell", "Cross-sell".
-    3. Substitua por "Risco de Saída", "Expansão", "Oferta Complementar".
-    
-    Seja direto e acionável.
+    Diretrizes de Qualidade:
+    1. SEJA ESPECÍFICO: Mencione rotas, valores ou prazos.
+    2. EVITE O ÓBVIO: Não diga "ligue para o cliente". Diga "Agende QBR para discutir a queda de 15% no volume da rota X".
+    3. Use terminologia de logística se apropriado (frete, rotas, sinistralidade, lead time).
+    4. NÃO use termos em inglês (Churn, Cross-sell).
   `;
 
   try {
@@ -128,6 +132,7 @@ export const generateClientInsights = async (client: Client): Promise<InsightRes
       model: model,
       contents: prompt,
       config: {
+        thinkingConfig: { thinkingBudget: 32768 }, // Orçamento alto para raciocínio profundo
         responseMimeType: "application/json",
         responseSchema: {
             type: Type.ARRAY,
@@ -162,7 +167,8 @@ export const generateClientInsights = async (client: Client): Promise<InsightRes
 export const generatePortfolioAnalysis = async (clients: Client[]): Promise<string> => {
   if (!process.env.API_KEY) return "Erro: API Key não configurada no ambiente.";
   
-  const model = "gemini-2.5-flash";
+  // Modelo potente para análise massiva de dados
+  const model = "gemini-3-pro-preview";
 
   // 1. Preparar Resumo dos Dados (Contexto)
   const totalRevenue = clients.reduce((acc, c) => acc + c.totalRevenue, 0);
@@ -198,69 +204,43 @@ export const generatePortfolioAnalysis = async (clients: Client[]): Promise<stri
   };
 
   const prompt = `
-    Quero que você atue como um analista avançado de carteira de clientes para melhorar as análises que já existem e adicionar novas.
+    Atue como um Diretor de Planejamento Comercial de uma transportadora/logística.
+    Sua tarefa é analisar a carteira de clientes abaixo e gerar um relatório executivo de alto nível.
     
     CONTEXTO DOS DADOS (JSON):
     ${JSON.stringify(contextData)}
 
-    Sua primeira tarefa é validar quais análises são possíveis com os dados disponíveis (veja 'columns_available' no JSON), e só então gerar um relatório completo.
+    Use seu "Thinking Mode" para conectar pontos não óbvios.
+    Por exemplo: se a receita está concentrada em poucos clientes (Curva A), alerte sobre risco de dependência.
+    Se há muitos clientes com recência > 90 dias, critique a eficiência da equipe de retenção.
 
     ETAPA 1 — Validação da Base
-    Antes de gerar qualquer análise, faça:
-    Liste todas as colunas existentes na base (baseado no JSON acima).
-    Verifique quais análises abaixo são possíveis com os dados fornecidos.
-    Em cada item, escreva “✓ possível” ou “✗ não possível (falta X dado)”.
-    Só avance para a etapa 2 nas análises marcadas como “✓ possível”.
+    Verifique a integridade dos dados (Receita total, volumetria) e aponte inconsistências se houver.
 
-    ETAPA 2 — Realizar as análises possíveis abaixo
-    1. Profundidade da Receita (Receita + Margem + Mix)
-    Se houver dados de receita e/ou margem:
-    Calcule a concentração de receita: quanto % do total representam os TOP clientes.
-    Analise o ticket médio.
-    (Nota: Margem e Mix de Produtos podem não estar disponíveis, verifique).
+    ETAPA 2 — Análise Profunda
+    1. Concentração de Carteira (Pareto): Qual o risco atual de dependência dos Top 10 clientes?
+    2. Saúde da Base: A proporção de ativos vs risco vs perdidos é saudável para o setor?
+    3. Oportunidades Ocultas: Identifique padrões nos clientes de 'ticket médio alto' que estão entrando em risco.
 
-    2. Análise de Comportamento e Tendência
-    Se existirem dados mensais ou datas de faturamento (temos 'recency' e totais):
-    Identifique padrões de frequência.
-    Calcule o ticket médio global.
-    Destaque clientes com manutenção da recorrência, porém queda no ticket médio (se dedutível).
+    ETAPA 3 — Plano de Ação (Report)
+    Gere um relatório em Markdown com:
+    - **Diagnóstico Executivo**: 2 parágrafos com a situação real da empresa.
+    - **Pontos de Alerta Crítico**: Onde estamos perdendo dinheiro?
+    - **Recomendações Táticas**: Ações práticas para a equipe comercial (ex: "Campanha de reativação para clientes inativos há 90-120 dias com oferta X").
 
-    3. Risco e Churn – Análise Inteligente
-    Caso existam dados de períodos, volumes e histórico:
-    Estime a probabilidade de churn baseada na Recência (dias sem comprar).
-    Identifique clientes em pré-churn com alertas claros.
-    Cruze tempo desde o último faturamento x curva ABC para destacar grandes clientes sumindo.
-
-    4. Reativação – Análise Avançada
-    Se houver dados de reativação ou datas de última compra:
-    Calcule o potencial de reativação baseado em Último faturamento e Histórico.
-    Classifique clientes inativos por potencial de retorno.
-
-    5. Segmentação Inteligente (Clusters)
-    Se houver dados suficientes:
-    Execute uma análise mental de clusterização baseada em Valor (Revenue) x Frequência (Shipments).
-    Nomeie clusters como: 'Campeões', 'Baleias (Alto Valor/Baixa Freq)', 'Formigas (Baixo Valor/Alta Freq)', 'Em Risco'.
-    Gere insights práticos para cada cluster.
-
-    ETAPA 3 — Entrega Final
-    Organize a resposta nos seguintes blocos (Use Markdown para formatar):
-    1. Validação dos dados da base.
-    2. Resumo executivo da carteira (insights principais).
-    3. Tabelas/Listas das análises possíveis (Use tabelas Markdown).
-    4. Alertas importantes (clientes em pré-churn, anomalias).
-    5. Sugestões de ação comercial por Cluster.
-
-    REGRAS IMPORTANTES
-    Nunca gere erro caso algum dado não exista. Apenas indique que a análise não é possível.
-    Só execute análises marcadas como “✓ possível”.
-    Mantenha clareza, precisão e visão analítica de alto nível.
-    Substitua termos técnicos como Upsell e Cross-sell por termos mais naturais em português (ex: Expansão, Oferta Complementar).
+    REGRAS:
+    - Seja direto, duro se necessário, e profissional.
+    - Use formatação Markdown (Negrito, Listas, Títulos).
+    - Não invente dados que não estão no JSON.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
+      config: {
+        thinkingConfig: { thinkingBudget: 32768 },
+      }
     });
 
     return response.text || "Não foi possível gerar a análise.";
