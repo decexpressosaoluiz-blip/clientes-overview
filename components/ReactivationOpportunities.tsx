@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Client } from '../types';
-import { AlertCircle, Calendar, ChevronRight, Download, Sparkles, TrendingUp, Filter, Ban } from 'lucide-react';
+import { AlertCircle, Calendar, ChevronRight, Download, Sparkles, TrendingUp, Filter, Ban, DollarSign, Package } from 'lucide-react';
 
 interface ReactivationOpportunitiesProps {
   clients: Client[];
@@ -14,17 +14,18 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
   const { activeOpportunities, justifiedOpportunities } = useMemo(() => {
     const allOpp = clients.filter(c => c.recency > 90);
     const justified = allOpp.filter(c => !!c.justification);
+    
+    // ORDENAÇÃO INTELIGENTE PARA REATIVAÇÃO
+    // Prioridade: LTV (Faturamento Total) > Recorrência > Ticket
+    // Penalidade: Clientes com menos de 3 envios caem drasticamente no ranking
     const active = allOpp.filter(c => !c.justification).sort((a, b) => {
-          const getTagWeight = (tag: string | undefined | null) => {
-              if (tag === 'Frete Premium') return 4;
-              if (tag === 'Alto Volume') return 3;
-              if (tag === 'Recuperável') return 2;
-              return 1;
-          };
-          const weightA = getTagWeight(a.opportunityTag);
-          const weightB = getTagWeight(b.opportunityTag);
-          if (weightA !== weightB) return weightB - weightA;
-          return b.averageTicket - a.averageTicket;
+          // Penalidade forte para clientes "One-Off" (1 ou 2 envios)
+          if (a.totalShipments <= 2 && b.totalShipments > 2) return 1;
+          if (b.totalShipments <= 2 && a.totalShipments > 2) return -1;
+          
+          // Se ambos tem bom volume, ordena pelo dinheiro deixado na mesa (LTV Total)
+          // Isso resolve o problema de Ticket alto em 1 envio vs Volume massivo de envios
+          return b.totalRevenue - a.totalRevenue;
       });
       return { activeOpportunities: active, justifiedOpportunities: justified };
   }, [clients]);
@@ -34,7 +35,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
 
   const handleExport = () => {
       if (displayedList.length === 0) return;
-      const headers = ['Nome do Cliente', 'CNPJ/CPF', 'Ultimo Envio', 'Dias Inativo', 'Ticket Medio', 'Total Historico', 'Justificativa'];
+      const headers = ['Nome do Cliente', 'CNPJ/CPF', 'Ultimo Envio', 'Dias Inativo', 'Ticket Medio', 'Total Historico', 'Total Envios', 'Justificativa'];
       const csvContent = [
           headers.join(';'),
           ...displayedList.map(c => [
@@ -43,7 +44,8 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
               c.lastShipmentDate,
               c.recency,
               c.averageTicket.toFixed(2).replace('.', ','),
-              c.monetary.toFixed(2).replace('.', ','),
+              c.totalRevenue.toFixed(2).replace('.', ','), // Mudado para monetary (totalRevenue do filtro) ou monetary (geral) se necessário, aqui usa o do objeto
+              c.totalShipments,
               c.justification ? c.justification.reason : (c.opportunityTag || 'Baixo Potencial')
           ].join(';'))
       ].join('\n');
@@ -59,10 +61,13 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
 
   const getPotentialLabel = (client: Client) => {
       if (client.justification) return { label: client.justification.reason || 'Justificado', color: 'text-sle-neutral-500 bg-sle-neutral-100 border-sle-neutral-200' };
-      if (client.opportunityTag === 'Frete Premium') return { label: 'Potencial Extremo', color: 'text-purple-600 bg-purple-50 border-purple-100 ring-purple-50' };
-      if (client.opportunityTag === 'Alto Volume') return { label: 'Alta Rentabilidade', color: 'text-emerald-600 bg-emerald-50 border-emerald-100 ring-emerald-50' };
-      if (client.averageTicket > 1000) return { label: 'Bom Ticket', color: 'text-indigo-600 bg-indigo-50 border-indigo-100 ring-indigo-50' };
-      return { label: 'Padrão', color: 'text-sle-neutral-500 bg-sle-neutral-100 border-sle-neutral-200' };
+      
+      // Labels baseados nas tags geradas ou lógica visual
+      if (client.opportunityTag === 'Frete Premium') return { label: 'Ticket Recorrente', color: 'text-purple-600 bg-purple-50 border-purple-100 ring-purple-50' };
+      if (client.opportunityTag === 'Alto Volume') return { label: 'Alto LTV', color: 'text-emerald-600 bg-emerald-50 border-emerald-100 ring-emerald-50' };
+      if (client.totalShipments > 10) return { label: 'Alta Frequência', color: 'text-indigo-600 bg-indigo-50 border-indigo-100 ring-indigo-50' };
+      
+      return { label: 'Recuperável', color: 'text-sle-neutral-500 bg-sle-neutral-100 border-sle-neutral-200' };
   };
 
   return (
@@ -75,7 +80,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
               <div className={`p-2 rounded-xl transition-colors ${showJustified ? 'bg-sle-neutral-100 text-sle-neutral-500' : 'bg-amber-50 text-amber-500'}`}>
                 {showJustified ? <Ban size={20} strokeWidth={2.5} /> : <Sparkles size={20} strokeWidth={2.5} fill="currentColor" fillOpacity={0.2} />}
               </div>
-              <span className="truncate">{showJustified ? 'Justificados' : 'Reativação'}</span>
+              <span className="truncate">{showJustified ? 'Justificados' : 'Reativação Inteligente'}</span>
             </h3>
         </div>
         <div className="flex gap-2">
@@ -135,16 +140,19 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
                             <span className={`text-[9px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded border truncate ${potential.color}`}>
                                 {potential.label}
                             </span>
+                            <span className="text-[9px] font-bold text-sle-neutral-400 flex items-center gap-1 bg-sle-neutral-50 px-1.5 py-0.5 rounded">
+                                <Package size={10} strokeWidth={2.5}/> {client.totalShipments} envios
+                            </span>
                         </div>
                       </div>
                   </div>
                   
                   <div className="text-right hidden sm:block">
                      <div className="flex items-center justify-end gap-1 text-[10px] font-bold text-sle-neutral-400 uppercase tracking-wide">
-                        Ticket Médio <TrendingUp size={12} className="text-emerald-500" />
+                        Total Histórico <DollarSign size={10} className="text-emerald-500" />
                      </div>
                      <div className="text-sm font-extrabold text-sle-neutral-900 group-hover:text-indigo-700 tabular-nums">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(client.averageTicket)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(client.totalRevenue)}
                      </div>
                   </div>
                 </button>
@@ -159,7 +167,7 @@ export const ReactivationOpportunities: React.FC<ReactivationOpportunitiesProps>
       </div>
 
       <button 
-        onClick={() => onDrillDown(showJustified ? 'Clientes Justificados' : 'Prioridade de Reativação (Ranking IA)', displayedList)}
+        onClick={() => onDrillDown(showJustified ? 'Clientes Justificados' : 'Prioridade de Reativação (LTV & Recorrência)', displayedList)}
         className="mt-6 w-full py-3.5 rounded-xl bg-sle-neutral-50 hover:bg-indigo-50 border border-sle-neutral-100 hover:border-indigo-200 text-sle-neutral-600 hover:text-indigo-600 font-bold text-xs uppercase tracking-wide transition-all flex items-center justify-center group active:scale-95 cursor-pointer shadow-sm hover:shadow-md"
       >
         Ver Lista Completa ({displayedList.length})

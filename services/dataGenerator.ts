@@ -518,14 +518,31 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
       else if (score >= 60) health = HealthScore.GOOD;
       else if (score <= 30) health = HealthScore.CRITICAL;
 
+      // --- TAG DE OPORTUNIDADE INTELIGENTE ---
+      // Objetivo: Priorizar clientes com FLUXO (Recorrência) e VALOR (LTV)
       let opportunityTag: OpportunityTag = null;
       if (segment === Segment.AT_RISK || segment === Segment.LOST) {
            const globalRev = client.history.reduce((acc, h) => acc + h.value, 0);
-           const avgTicket = client.history.length > 0 ? globalRev / client.history.length : 0;
+           const totalShipments = client.history.length;
+           const avgTicket = totalShipments > 0 ? globalRev / totalShipments : 0;
            
-           if (avgTicket > 5000) opportunityTag = 'Frete Premium';
-           else if (globalRev > 50000) opportunityTag = 'Alto Volume';
-           else if (client.history.length > 10) opportunityTag = 'Recuperável';
+           // Regras mais estritas para evitar "compra única" no topo
+           if (totalShipments <= 2) {
+               // Cliente One-off (não ganha tag de destaque imediato)
+               opportunityTag = null; 
+           } 
+           // Frete Premium: Alto Ticket E Recorrência mínima
+           else if (avgTicket > 3000 && totalShipments >= 4) {
+               opportunityTag = 'Frete Premium';
+           } 
+           // Alto Volume: Faturamento total alto (LTV)
+           else if (globalRev > 50000) {
+               opportunityTag = 'Alto Volume';
+           } 
+           // Recuperável: Recorrência boa, mesmo com ticket menor
+           else if (totalShipments >= 10) {
+               opportunityTag = 'Recuperável';
+           }
       }
 
       processedClients.push({
