@@ -478,17 +478,42 @@ export const processClients = (allClients: Client[], filters: FilterState): Proc
 
       if (hasSegmentFilter && !segmentsSet.has(segment)) continue;
 
-      let score = 50;
-      if (segment === Segment.LOST) score = 10;
-      else if (segment === Segment.AT_RISK) score = 30;
-      else {
-          score = 70;
-          if (daysSinceLastGlobal < 15) score += 10;
-          if (segment === Segment.CHAMPIONS) score += 15;
+      // --- ALGORITMO DE SCORING ATUALIZADO ---
+      let score = 50; 
+
+      if (segment === Segment.LOST) {
+          score = 10; // Crítico (0-30)
+      } else if (segment === Segment.AT_RISK) {
+          score = 30; // Crítico (0-30)
+      } else {
+          // Clientes Ativos (Recência <= 90 dias)
+          // Base para "Bom"
+          score = 70; 
+
+          // Penalidade para clientes "esfriando" (60 a 90 dias)
+          // Isso força o score para a faixa de ATENÇÃO (31-59)
+          if (daysSinceLastGlobal > 60) {
+              score -= 25; // 70 - 25 = 45 (Atenção)
+          } 
+          // Leve penalidade para 30-60 dias
+          else if (daysSinceLastGlobal > 30) {
+              score -= 5; // 70 - 5 = 65 (Bom)
+          } 
+          // Bônus para muito recentes
+          else if (daysSinceLastGlobal < 15) {
+              score += 15; // 70 + 15 = 85 (Excelente)
+          }
+
+          // Bônus de Segmento
+          if (segment === Segment.CHAMPIONS) score += 10;
           if (segment === Segment.NEW) score += 5;
       }
 
-      let health = HealthScore.WARNING;
+      // Trava de segurança
+      score = Math.max(0, Math.min(100, score));
+
+      // Classificação do Health Score
+      let health = HealthScore.WARNING; // Default para faixa 31-59
       if (score >= 80) health = HealthScore.EXCELLENT;
       else if (score >= 60) health = HealthScore.GOOD;
       else if (score <= 30) health = HealthScore.CRITICAL;
