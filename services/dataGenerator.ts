@@ -318,6 +318,9 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
     const activeRelevant = clients.filter(c => c.recency <= 90 && c.totalRevenue > 0);
 
     activeRelevant.forEach(client => {
+        let ticketDrop: ClientAlert | null = null;
+        let freqDrop: ClientAlert | null = null;
+
         // Alerta de Queda de Ticket - Apenas para clientes Base (Recorrentes/Campeões)
         if ((client.abcCategory === ABCCategory.A || client.abcCategory === ABCCategory.B) && client.segment !== Segment.NEW) {
             const history = client.history.sort((a,b) => a.date.localeCompare(b.date));
@@ -325,16 +328,17 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
             if (last3.length >= 2) {
                 const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / last3.length;
                 if (recentAvg < (client.averageTicket * 0.7)) {
-                    alerts.push({
+                    const dropPct = Math.round((1 - recentAvg/client.averageTicket)*100);
+                    ticketDrop = {
                         id: `tk-${client.id}`,
                         clientId: client.id,
                         clientName: client.name,
                         client: client,
                         type: 'ticket_drop',
                         severity: 'high',
-                        metric: `-${Math.round((1 - recentAvg/client.averageTicket)*100)}%`,
+                        metric: `-${dropPct}%`,
                         message: 'Queda brusca no ticket médio (últimos 3 envios).'
-                    });
+                    };
                 }
             }
         }
@@ -347,7 +351,7 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
              const threshold = Math.max(15, avgInterval * 2.5);
 
              if (client.recency > threshold && client.recency < 180) {
-                 alerts.push({
+                 freqDrop = {
                     id: `fq-${client.id}`,
                     clientId: client.id,
                     clientName: client.name,
@@ -356,8 +360,24 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
                     severity: 'medium',
                     metric: `${client.recency}d sem envios`,
                     message: `Frequência de compra interrompida (Média: a cada ${Math.round(avgInterval)} dias).`
-                 });
+                 };
              }
+        }
+
+        // Lógica de Unificação (Evitar duplicidade de cards para o mesmo cliente)
+        if (freqDrop && ticketDrop) {
+            // Se tiver ambos, cria um alerta combinado de alta severidade
+            alerts.push({
+                ...freqDrop, // Baseia no de frequência que é mais crítico
+                id: `mixed-${client.id}`,
+                type: 'anomaly', // Tipo genérico para layout crítico
+                metric: `${freqDrop.metric}`, // Mantém a métrica de dias parado
+                message: `Anomalia Crítica: Interrupção de frequência combinada com queda de ticket (${ticketDrop.metric}).`
+            });
+        } else if (freqDrop) {
+            alerts.push(freqDrop);
+        } else if (ticketDrop) {
+            alerts.push(ticketDrop);
         }
     });
 

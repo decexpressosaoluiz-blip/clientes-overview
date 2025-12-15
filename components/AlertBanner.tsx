@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertTriangle, X, ArrowRight, Zap, TrendingDown, Clock, DollarSign, Package } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, X, ArrowRight, Zap, TrendingDown, Clock, DollarSign, Package, ChevronDown, ChevronUp } from 'lucide-react';
 import { ClientAlert, Client } from '../types';
 
 interface AlertBannerProps {
@@ -9,12 +9,15 @@ interface AlertBannerProps {
 }
 
 export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onViewClient }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (alerts.length === 0) return null;
 
   const getAlertIcon = (type: string) => {
     switch (type) {
         case 'ticket_drop': return <TrendingDown size={18} strokeWidth={2.5} />;
         case 'frequency_drop': return <Clock size={18} strokeWidth={2.5} />;
+        case 'anomaly': return <AlertTriangle size={18} strokeWidth={2.5} />;
         default: return <AlertTriangle size={18} strokeWidth={2.5} />;
     }
   };
@@ -27,9 +30,11 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onV
     }
   };
 
+  const visibleAlerts = isExpanded ? alerts : alerts.slice(0, 6);
+
   return (
     <div className="mb-8 animate-in slide-in-from-top-4 duration-500">
-      <div className="bg-white border border-rose-100 rounded-3xl p-6 shadow-elevated relative overflow-hidden">
+      <div className="bg-white border border-rose-100 rounded-3xl p-6 shadow-elevated relative overflow-hidden transition-all duration-300">
         <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
         
         <div className="flex items-center gap-3 mb-6">
@@ -45,7 +50,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onV
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {alerts.slice(0, 6).map((alert) => {
+          {visibleAlerts.map((alert) => {
             const s = getStyles(alert.type);
             return (
                 <div 
@@ -98,8 +103,19 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alerts, onDismiss, onV
         
         {alerts.length > 6 && (
              <div className="mt-4 text-center border-t border-sle-neutral-100 pt-4">
-                <button className="text-xs font-bold text-rose-600 uppercase tracking-wide hover:bg-rose-50 px-4 py-2 rounded-full transition-colors">
-                    Ver mais {alerts.length - 6} alertas
+                <button 
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 uppercase tracking-wide hover:bg-rose-50 px-5 py-2.5 rounded-full transition-colors active:scale-95"
+                >
+                    {isExpanded ? (
+                        <>
+                            <ChevronUp size={16} /> Ver menos
+                        </>
+                    ) : (
+                        <>
+                            <ChevronDown size={16} /> Ver mais {alerts.length - 6} alertas
+                        </>
+                    )}
                 </button>
              </div>
         )}
