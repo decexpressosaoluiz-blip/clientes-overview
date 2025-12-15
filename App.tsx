@@ -480,7 +480,7 @@ const App: React.FC = () => {
                         <p className="text-xs sm:text-sm text-sle-neutral-500 font-medium mt-1">Top 25 por volume financeiro no período.</p>
                     </div>
                     <button 
-                        onClick={() => openDrillDown('Ranking Completo', filteredClients.sort((a,b) => b.totalRevenue - a.totalRevenue))}
+                        onClick={() => openDrillDown('Ranking Completo', [...filteredClients].sort((a,b) => b.totalRevenue - a.totalRevenue))}
                         className="text-xs font-bold text-indigo-600 bg-indigo-50 px-5 py-2.5 rounded-full hover:bg-indigo-100 transition-all active:scale-95 cursor-pointer shadow-sm hover:shadow-md w-full sm:w-auto"
                     >
                         Ver Todos

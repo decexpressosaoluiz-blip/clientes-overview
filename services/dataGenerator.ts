@@ -323,7 +323,8 @@ export const generateClientAlerts = (clients: Client[]): ClientAlert[] => {
 
         // Alerta de Queda de Ticket - Apenas para clientes Base (Recorrentes/Campeões)
         if ((client.abcCategory === ABCCategory.A || client.abcCategory === ABCCategory.B) && client.segment !== Segment.NEW) {
-            const history = client.history.sort((a,b) => a.date.localeCompare(b.date));
+            // FIX: Copy array before sorting to avoid "Cannot assign to read only property" error
+            const history = [...client.history].sort((a,b) => a.date.localeCompare(b.date));
             const last3 = history.slice(-3);
             if (last3.length >= 2) {
                 const recentAvg = last3.reduce((acc, h) => acc + h.value, 0) / last3.length;
