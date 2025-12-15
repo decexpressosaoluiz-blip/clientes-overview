@@ -26,10 +26,18 @@ const parseDateToString = (dateStr: string): string | null => {
   }
 
   // Tentar formatos comuns
-  // DD/MM/YYYY ou DD/MM/YY
-  if (clean.includes('/')) {
-    const parts = clean.split('/');
+  // DD/MM/YYYY ou DD-MM-YYYY
+  if (clean.includes('/') || clean.includes('-')) {
+    // Normaliza separador para barra
+    const parts = clean.replace(/-/g, '/').split('/');
+    
+    // Caso DD/MM/YYYY
     if (parts.length === 3) {
+      // Verifica se o primeiro termo é ano (YYYY-MM-DD) ou dia
+      if (parts[0].length === 4) {
+          return clean.replace(/\//g, '-'); // Já está quase ISO, só garante hífens
+      }
+
       const day = parseInt(parts[0], 10);
       const month = parseInt(parts[1], 10);
       let year = parseInt(parts[2], 10);
@@ -42,13 +50,7 @@ const parseDateToString = (dateStr: string): string | null => {
       }
     }
   } 
-  // YYYY-MM-DD
-  else if (clean.includes('-')) {
-    const parts = clean.split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-        return clean;
-    }
-  }
+  
   return null;
 };
 
@@ -56,6 +58,7 @@ const splitCSVLine = (line: string): string[] => {
     const result: string[] = [];
     let current = '';
     let inQuotes = false;
+    // Detecta separador mais provável
     const separator = line.includes(';') ? ';' : ',';
 
     for (let i = 0; i < line.length; i++) {
@@ -113,19 +116,29 @@ const parseCSVText = (text: string): Client[] => {
 
     if (!cnpj || cnpj === 'N/I' || cnpj.length < 5) continue;
 
-    // Chave única sanitizada
-    const cleanCnpj = cnpj.replace(/\D/g, '');
+    // NORMALIZAÇÃO DE CNPJ/CPF UNIFICADA
+    // Remove tudo que não é dígito
+    let cleanCnpj = cnpj.replace(/\D/g, '');
+    
+    // Regra unificada: Se tem conteúdo numérico até 14 dígitos, padroniza com zeros à esquerda até 14.
+    // Isso resolve:
+    // 1. CNPJ que perdeu zero no Excel (123... -> 0123...)
+    // 2. CPF (11 dígitos) sendo comparado com CPF formatado ou sem zero
+    // 3. Garante chave única independente da formatação de entrada
+    if (cleanCnpj.length > 0 && cleanCnpj.length <= 14) {
+        cleanCnpj = cleanCnpj.padStart(14, '0');
+    }
+    
     const clientKey = cleanCnpj || cnpj;
 
     if (!clientsMap.has(clientKey)) {
       clientsMap.set(clientKey, {
         id: clientKey,
         name: name,
-        cnpj: cnpj,
+        cnpj: cnpj, // Mantém original para exibição, ou poderia usar cleanCnpj formatado
         history: [], 
         origin: [],
         destination: [],
-        // Inicializa com null para ser preenchido corretamente depois
         firstShipmentDate: undefined, 
         lastShipmentDate: undefined
       });
@@ -148,7 +161,7 @@ const parseCSVText = (text: string): Client[] => {
             month: month
         });
 
-        // Atualização dinâmica de datas extremas
+        // Atualização dinâmica de datas extremas (Compraração de Strings ISO YYYY-MM-DD funciona)
         if (!client.lastShipmentDate || dateIsoString > client.lastShipmentDate) {
             client.lastShipmentDate = dateIsoString;
         }
