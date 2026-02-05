@@ -38,7 +38,26 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
     }
   }, [clientSearch, debouncedSearch]);
 
-  const years = [2021, 2022, 2023, 2024, 2025];
+  // Geração dinâmica dos anos baseada nos dados carregados
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<number>();
+    
+    // Adiciona anos padrão para garantir UI estável caso não haja dados ainda
+    const currentYear = new Date().getFullYear();
+    yearsSet.add(currentYear);
+    
+    // Varre o histórico de todos os clientes para encontrar anos disponíveis
+    clients.forEach(client => {
+        client.history.forEach(transaction => {
+            if (transaction.year) {
+                yearsSet.add(transaction.year);
+            }
+        });
+    });
+
+    return Array.from(yearsSet).sort((a, b) => a - b);
+  }, [clients]);
+
   const months = [
     { num: 1, name: 'Jan' }, { num: 2, name: 'Fev' }, { num: 3, name: 'Mar' }, 
     { num: 4, name: 'Abr' }, { num: 5, name: 'Mai' }, { num: 6, name: 'Jun' },
@@ -452,14 +471,14 @@ export const FilterBar: React.FC<FilterBarProps> = memo(({
       {/* --- MIDDLE SECTION: Time Filters --- */}
       <div className="bg-sle-neutral-50/60 rounded-2xl p-4 sm:p-5 border border-sle-neutral-100">
           <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
-              {/* Years */}
+              {/* Years - Dynamic List */}
               <div className="w-full lg:w-auto flex-shrink-0">
                   <div className="flex items-center gap-2 mb-3 text-sle-neutral-400">
                       <CalendarRange size={14} strokeWidth={2.5} />
                       <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Ano de Referência</span>
                   </div>
                   <div className="flex flex-row lg:flex-wrap gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
-                     {years.map(year => (
+                     {availableYears.map(year => (
                          <button 
                             key={year} 
                             onClick={() => toggleYear(year)} 
